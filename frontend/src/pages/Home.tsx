@@ -9,7 +9,7 @@ const buttonClassName =
 
 export default function Home() {
   const dispatch = useAppDispatch();
-  const { status, roomId, username, error } = useAppSelector((state) => state.connection);
+  const { status, error } = useAppSelector((state) => state.connection);
   const isLoading = status === "loading";
 
   const [joinRoomId, setJoinRoomId] = useState("");
@@ -44,9 +44,9 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#ff5d4a] px-4 py-10">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#ff6a4a] via-[#ff5a4a] to-[#ff4a53] px-4 py-10">
       <section className="w-full max-w-sm rounded-lg bg-[#ececec] p-6 shadow-[0_20px_35px_rgba(0,0,0,0.20)] sm:p-8">
-        <h1 className="font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-zinc-950">
+        <h1 className="bg-gradient-to-r from-[#ff5a4a] via-[#ff7c3f] to-[#ffb22f] bg-clip-text text-center font-['Bebas_Neue'] text-6xl leading-none tracking-wider text-transparent drop-shadow-[0_2px_0_rgba(0,0,0,0.20)]">
           Scribble Squad
         </h1>
 
@@ -92,12 +92,6 @@ export default function Home() {
         </form>
 
         {error && <p className="mt-4 text-sm font-semibold text-red-700">{error}</p>}
-
-        {status === "connected" && (
-          <p className="mt-3 text-sm font-semibold text-emerald-800">
-            Connected as {username} in room {roomId}.
-          </p>
-        )}
       </section>
     </div>
   );

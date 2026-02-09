@@ -23,12 +23,28 @@ function createUniqueRoomId() {
   return roomId;
 }
 
+function serializeRoom(room) {
+  return {
+    roomId: room.id,
+    players: [...room.players]
+  };
+}
+
 router.get("/", (_req, res) => {
-  const roomSummaries = Array.from(rooms.values()).map((room) => ({
-    id: room.id,
-    players: room.players
-  }));
+  const roomSummaries = Array.from(rooms.values()).map(serializeRoom);
   res.json({ rooms: roomSummaries });
+});
+
+router.get("/:roomId", (req, res) => {
+  const roomId = String(req.params.roomId || "").trim().toUpperCase();
+  const room = rooms.get(roomId);
+
+  if (!room) {
+    res.status(404).json({ error: "Room not found." });
+    return;
+  }
+
+  res.json(serializeRoom(room));
 });
 
 router.post("/create", (req, res) => {
@@ -47,7 +63,7 @@ router.post("/create", (req, res) => {
   };
 
   rooms.set(roomId, room);
-  res.status(201).json({ roomId, username });
+  res.status(201).json({ ...serializeRoom(room), username });
 });
 
 router.post("/join", (req, res) => {
@@ -65,14 +81,17 @@ router.post("/join", (req, res) => {
     return;
   }
 
-  const alreadyInRoom = room.players.some(
+  const existingPlayer = room.players.find(
     (player) => player.toLowerCase() === username.toLowerCase()
   );
-  if (!alreadyInRoom) {
+  if (!existingPlayer) {
     room.players.push(username);
   }
 
-  res.json({ roomId, username });
+  res.json({
+    ...serializeRoom(room),
+    username: existingPlayer || username
+  });
 });
 
 export default router;

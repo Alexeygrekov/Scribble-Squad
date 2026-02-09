@@ -8,6 +8,7 @@ type ConnectionState = {
   status: SessionStatus;
   username: string;
   roomId: string;
+  players: string[];
   error: string | null;
 };
 
@@ -23,12 +24,19 @@ type CreateGamePayload = {
 type RoomResponse = {
   roomId: string;
   username: string;
+  players: string[];
+};
+
+type RoomDetailsResponse = {
+  roomId: string;
+  players: string[];
 };
 
 const initialState: ConnectionState = {
   status: "idle",
   username: "",
   roomId: "",
+  players: [],
   error: null
 };
 
@@ -76,19 +84,40 @@ export const createGame = createAsyncThunk<RoomResponse, CreateGamePayload, { re
   }
 );
 
+export const fetchRoom = createAsyncThunk<RoomDetailsResponse, { roomId: string }, { rejectValue: string }>(
+  "connection/fetchRoom",
+  async ({ roomId }, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${encodeURIComponent(roomId)}`);
+      return await parseApiResponse<RoomDetailsResponse>(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to fetch room";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 const connectionSlice = createSlice({
   name: "connection",
   initialState,
   reducers: {
     clearError: (state) => {
       state.error = null;
-      if (state.status === "error") {
+      if (state.status === "error" && !state.roomId) {
         state.status = "idle";
       }
     },
     setError: (state, action: PayloadAction<string>) => {
       state.error = action.payload;
-      state.status = "error";
+      if (!state.roomId) {
+        state.status = "error";
+      }
+    },
+    leaveLobby: () => {
+      return {
+        ...initialState,
+        players: []
+      };
     }
   },
   extraReducers: (builder) => {
@@ -101,6 +130,8 @@ const connectionSlice = createSlice({
         state.status = "connected";
         state.roomId = action.payload.roomId;
         state.username = action.payload.username;
+        state.players = action.payload.players;
+        state.error = null;
       })
       .addCase(joinGame.rejected, (state, action) => {
         state.status = "error";
@@ -114,15 +145,26 @@ const connectionSlice = createSlice({
         state.status = "connected";
         state.roomId = action.payload.roomId;
         state.username = action.payload.username;
+        state.players = action.payload.players;
+        state.error = null;
       })
       .addCase(createGame.rejected, (state, action) => {
         state.status = "error";
         state.error = action.payload || "Unable to create game";
+      })
+      .addCase(fetchRoom.fulfilled, (state, action) => {
+        if (state.roomId === action.payload.roomId) {
+          state.players = action.payload.players;
+          state.error = null;
+        }
+      })
+      .addCase(fetchRoom.rejected, (state, action) => {
+        state.error = action.payload || "Unable to refresh lobby";
       });
   }
 });
 
-export const { clearError, setError } = connectionSlice.actions;
+export const { clearError, setError, leaveLobby } = connectionSlice.actions;
 
 export const store = configureStore({
   reducer: {
