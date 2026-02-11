@@ -11,8 +11,15 @@ type StoredSession = {
   username: string;
 };
 
+function normalizePath(pathname: string) {
+  if (pathname.length <= 1) {
+    return "/";
+  }
+  return pathname.replace(/\/+$/, "");
+}
+
 function getLobbyRoomId(pathname: string) {
-  const match = pathname.match(/^\/lobby\/([A-Za-z0-9_-]+)$/);
+  const match = pathname.match(/^\/lobby\/([A-Za-z0-9_-]+)$/i);
   return match?.[1]?.toUpperCase() || null;
 }
 
@@ -53,26 +60,29 @@ function clearStoredSession() {
 export default function App() {
   const dispatch = useAppDispatch();
   const { status, roomId, username } = useAppSelector((state) => state.connection);
-  const [pathname, setPathname] = useState(() => window.location.pathname);
-  const [isRestoringLobby, setIsRestoringLobby] = useState(() => Boolean(getLobbyRoomId(window.location.pathname)));
+  const [pathname, setPathname] = useState(() => normalizePath(window.location.pathname));
+  const [isRestoringLobby, setIsRestoringLobby] = useState(() => Boolean(getLobbyRoomId(normalizePath(window.location.pathname))));
   const attemptedRestoreRef = useRef<string | null>(null);
-  const routeRoomId = useMemo(() => getLobbyRoomId(pathname), [pathname]);
+  const normalizedPathname = useMemo(() => normalizePath(pathname), [pathname]);
+  const routeRoomId = useMemo(() => getLobbyRoomId(normalizedPathname), [normalizedPathname]);
+  const isLobbyPath = normalizedPathname.startsWith("/lobby/");
 
   const navigate = useCallback((nextPath: string, replace = false) => {
-    if (window.location.pathname === nextPath) {
+    const normalizedNextPath = normalizePath(nextPath);
+    if (normalizePath(window.location.pathname) === normalizedNextPath) {
       return;
     }
 
     if (replace) {
-      window.history.replaceState(null, "", nextPath);
+      window.history.replaceState(null, "", normalizedNextPath);
     } else {
-      window.history.pushState(null, "", nextPath);
+      window.history.pushState(null, "", normalizedNextPath);
     }
-    setPathname(nextPath);
+    setPathname(normalizedNextPath);
   }, []);
 
   useEffect(() => {
-    const onPopState = () => setPathname(window.location.pathname);
+    const onPopState = () => setPathname(normalizePath(window.location.pathname));
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -81,18 +91,18 @@ export default function App() {
     if (status === "connected" && roomId && username) {
       writeStoredSession({ roomId, username });
       const lobbyPath = `/lobby/${roomId}`;
-      if (pathname !== lobbyPath) {
+      if (normalizedPathname !== lobbyPath) {
         navigate(lobbyPath, true);
       }
       setIsRestoringLobby(false);
       return;
     }
 
-    if (pathname === "/" && status !== "loading") {
+    if (normalizedPathname === "/" && status !== "loading") {
       clearStoredSession();
       setIsRestoringLobby(false);
     }
-  }, [navigate, pathname, roomId, status, username]);
+  }, [navigate, normalizedPathname, roomId, status, username]);
 
   useEffect(() => {
     if (!routeRoomId) {
@@ -125,12 +135,12 @@ export default function App() {
   }, [dispatch, navigate, roomId, routeRoomId, status, username]);
 
   useEffect(() => {
-    if (pathname !== "/" && !routeRoomId) {
+    if (normalizedPathname !== "/" && !isLobbyPath) {
       navigate("/", true);
     }
-  }, [navigate, pathname, routeRoomId]);
+  }, [isLobbyPath, navigate, normalizedPathname]);
 
-  if (routeRoomId && isRestoringLobby && status !== "connected") {
+  if (isLobbyPath && isRestoringLobby && status !== "connected") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7]">
         <p className="font-['Bebas_Neue'] text-5xl tracking-wider text-white">Loading Lobby...</p>
@@ -138,8 +148,16 @@ export default function App() {
     );
   }
 
-  if (routeRoomId) {
+  if (isLobbyPath && routeRoomId) {
     return <Lobby routeRoomId={routeRoomId} />;
+  }
+
+  if (isLobbyPath) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7]">
+        <p className="font-['Bebas_Neue'] text-5xl tracking-wider text-white">Lobby Not Found</p>
+      </div>
+    );
   }
 
   return <Home />;
