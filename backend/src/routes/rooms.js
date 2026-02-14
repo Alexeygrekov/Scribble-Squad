@@ -290,14 +290,17 @@ router.post("/:roomId/strokes", (req, res) => {
     return;
   }
 
+  const mode = stroke?.mode === "fill" ? "fill" : "stroke";
   const points = sanitizePoints(stroke?.points);
-  if (points.length < 2) {
+
+  if (mode === "stroke" && points.length < 2) {
     res.status(400).json({ error: "Stroke requires at least two points." });
     return;
   }
 
   const normalizedStroke = {
     id: `stroke_${Date.now()}_${randomInt(1000, 9999)}`,
+    mode,
     color: typeof stroke?.color === "string" ? stroke.color : "#f55a42",
     size: Math.max(1, Math.min(24, Number(stroke?.size) || 4)),
     points
@@ -309,6 +312,33 @@ router.post("/:roomId/strokes", (req, res) => {
   }
 
   res.status(201).json({ ok: true });
+});
+
+router.post("/:roomId/undo", (req, res) => {
+  const roomId = String(req.params.roomId || "").trim().toUpperCase();
+  const username = String(req.body?.username || "").trim();
+  const room = rooms.get(roomId);
+
+  if (!room) {
+    res.status(404).json({ error: "Room not found." });
+    return;
+  }
+
+  const resolvedPlayer = findPlayer(room, username);
+  if (!resolvedPlayer) {
+    res.status(403).json({ error: "You are not in this room." });
+    return;
+  }
+  if (room.drawer?.toLowerCase() !== resolvedPlayer.toLowerCase()) {
+    res.status(403).json({ error: "Only the drawer can undo." });
+    return;
+  }
+
+  if (room.strokes.length > 0) {
+    room.strokes.pop();
+  }
+
+  res.json({ ok: true });
 });
 
 router.post("/:roomId/clear", (req, res) => {

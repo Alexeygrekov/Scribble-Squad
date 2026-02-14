@@ -1,23 +1,98 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks";
-import { clearCanvas, fetchRoom, leaveLobby, sendGuess, sendStroke, type StrokePoint } from "../store";
+import { clearCanvas, fetchRoom, leaveLobby, sendGuess, sendStroke, undoStroke, type StrokePoint } from "../store";
 
 const ROOM_REFRESH_MS = 900;
 const SESSION_KEY = "scribble_squad_tab_session";
 const CANVAS_WIDTH = 760;
 const CANVAS_HEIGHT = 520;
+const CANVAS_BACKGROUND = "#ececec";
+const DRAW_COLORS = [
+  "#ffffff", "#c8ced8", "#4f5d75", "#f8e71c", "#ffb703", "#f94144", "#d59649", "#f6bdcf", "#f023e1", "#1717e0", "#17e5e5",
+  "#00e700", "#cfd2d8", "#000000", "#f2cc0c", "#ee7a16", "#b50000", "#af5b16", "#dc6ea7", "#9707a2", "#22228f", "#2999f0"
+];
+const THICKNESS_OPTIONS = [3, 6, 10, 14, 18];
 
 type RoomProps = {
   routeRoomId?: string;
 };
 
+type DrawTool = "brush" | "eraser" | "bucket";
+
 type DrawStroke = {
+  mode: "stroke" | "fill";
   color: string;
   size: number;
   points: StrokePoint[];
 };
 
+type IconProps = {
+  className?: string;
+};
+
+function BrushIcon({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+      <path d="M13.5 4.5 19.5 10.5 8 22H2v-6z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m12 6 6 6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function EraserIcon({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+      <path d="m4 15 7-9a2 2 0 0 1 3 0l6 7a2 2 0 0 1-.2 2.8l-1.5 1.3a2 2 0 0 1-1.3.5H9.5a2 2 0 0 1-1.5-.7L4 15Z" strokeLinejoin="round" />
+      <path d="M8.8 17.8h10.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function BucketIcon({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+      <path d="m6 9 6-6 6 6-6 6-6-6Z" strokeLinejoin="round" />
+      <path d="M12 15v4" strokeLinecap="round" />
+      <path d="M17 17a2 2 0 0 1 4 0c0 1.2-.9 2.2-2 2.2s-2-1-2-2.2Z" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function UndoIcon({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+      <path d="M9 7H4v5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 12a8 8 0 1 0 2.5-5.8L4 7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function TrashIcon({ className = "" }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+      <path d="M4 6h16" strokeLinecap="round" />
+      <path d="M8 6V4h8v2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m6 6 1 14h10l1-14" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 11v6M14 11v6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function createCursorDot(color: string, size: number) {
+  const cursorSize = Math.max(14, Math.min(28, size + 10));
+  const center = Math.floor(cursorSize / 2);
+  const radius = Math.max(3, Math.floor(size / 2) + 1);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${cursorSize}" height="${cursorSize}" viewBox="0 0 ${cursorSize} ${cursorSize}"><circle cx="${center}" cy="${center}" r="${radius}" fill="${color}" stroke="#1f2937" stroke-width="1.25"/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}") ${center} ${center}, crosshair`;
+}
+
 function drawStroke(ctx: CanvasRenderingContext2D, stroke: DrawStroke) {
+  if (stroke.mode === "fill") {
+    ctx.fillStyle = stroke.color;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    return;
+  }
+
   if (stroke.points.length < 2) {
     return;
   }
@@ -50,8 +125,10 @@ export default function Room({ routeRoomId }: RoomProps) {
   } = useAppSelector((state) => state.connection);
 
   const displayRoomId = roomId || routeRoomId || "";
-  const [brushColor, setBrushColor] = useState("#f55a42");
-  const [brushSize, setBrushSize] = useState(5);
+  const [brushColor, setBrushColor] = useState("#f94144");
+  const [brushSize, setBrushSize] = useState(6);
+  const [activeTool, setActiveTool] = useState<DrawTool>("brush");
+  const [activeAction, setActiveAction] = useState<"undo" | "delete" | null>(null);
   const [guessText, setGuessText] = useState("");
   const [isDrawing, setIsDrawing] = useState(false);
   const [liveStrokePoints, setLiveStrokePoints] = useState<StrokePoint[]>([]);
@@ -66,6 +143,8 @@ export default function Room({ routeRoomId }: RoomProps) {
     }
     return canDraw ? wordDisplay.toUpperCase() : wordDisplay.split("").join(" ");
   }, [canDraw, wordDisplay]);
+  const activeStrokeColor = activeTool === "eraser" ? CANVAS_BACKGROUND : brushColor;
+  const drawerCursor = useMemo(() => createCursorDot(brushColor, brushSize), [brushColor, brushSize]);
 
   useEffect(() => {
     if (!displayRoomId || !username) {
@@ -99,19 +178,20 @@ export default function Room({ routeRoomId }: RoomProps) {
       return;
     }
 
-    context.fillStyle = "#ececec";
+    context.fillStyle = CANVAS_BACKGROUND;
     context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     strokes.forEach((stroke) => drawStroke(context, stroke));
 
-    if (liveStrokePoints.length > 1) {
+    if (liveStrokePoints.length > 1 && activeTool !== "bucket") {
       drawStroke(context, {
-        color: brushColor,
+        mode: "stroke",
+        color: activeStrokeColor,
         size: brushSize,
         points: liveStrokePoints
       });
     }
-  }, [brushColor, brushSize, liveStrokePoints, strokes]);
+  }, [activeStrokeColor, activeTool, brushSize, liveStrokePoints, strokes]);
 
   function getCanvasPoint(event: ReactPointerEvent<HTMLCanvasElement>): StrokePoint {
     const canvas = canvasRef.current;
@@ -136,6 +216,22 @@ export default function Room({ routeRoomId }: RoomProps) {
       return;
     }
 
+    if (activeTool === "bucket") {
+      void dispatch(
+        sendStroke({
+          roomId: displayRoomId,
+          username,
+          stroke: {
+            mode: "fill",
+            color: brushColor,
+            size: brushSize,
+            points: []
+          }
+        })
+      );
+      return;
+    }
+
     const point = getCanvasPoint(event);
     const startingPoints = [point];
     drawingPointsRef.current = startingPoints;
@@ -144,7 +240,7 @@ export default function Room({ routeRoomId }: RoomProps) {
   }
 
   function handlePointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
-    if (!canDraw || !isDrawing) {
+    if (!canDraw || !isDrawing || activeTool === "bucket") {
       return;
     }
 
@@ -173,7 +269,8 @@ export default function Room({ routeRoomId }: RoomProps) {
         roomId: displayRoomId,
         username,
         stroke: {
-          color: brushColor,
+          mode: "stroke",
+          color: activeStrokeColor,
           size: brushSize,
           points
         }
@@ -200,7 +297,23 @@ export default function Room({ routeRoomId }: RoomProps) {
     if (!canDraw) {
       return;
     }
+    setActiveAction("delete");
+    window.setTimeout(() => {
+      setActiveAction((current) => (current === "delete" ? null : current));
+    }, 220);
     void dispatch(clearCanvas({ roomId: displayRoomId, username }));
+    void dispatch(fetchRoom({ roomId: displayRoomId, username }));
+  }
+
+  function handleUndo() {
+    if (!canDraw) {
+      return;
+    }
+    setActiveAction("undo");
+    window.setTimeout(() => {
+      setActiveAction((current) => (current === "undo" ? null : current));
+    }, 220);
+    void dispatch(undoStroke({ roomId: displayRoomId, username }));
     void dispatch(fetchRoom({ roomId: displayRoomId, username }));
   }
 
@@ -269,45 +382,121 @@ export default function Room({ routeRoomId }: RoomProps) {
               width={CANVAS_WIDTH}
               height={CANVAS_HEIGHT}
               className="w-full max-w-[760px] rounded-md border-2 border-white/40 bg-[#ececec] shadow-[0_18px_30px_rgba(0,0,0,0.2)] touch-none"
+              style={canDraw ? { cursor: drawerCursor } : undefined}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={finishStroke}
               onPointerLeave={finishStroke}
+              onPointerCancel={finishStroke}
             />
           </div>
 
           {canDraw ? (
-            <div className="mx-auto mt-4 flex w-full max-w-[760px] flex-wrap items-center gap-4 rounded bg-white/20 px-4 py-3 text-white">
-              <label className="flex items-center gap-2 text-sm font-semibold">
-                Color
-                <input
-                  type="color"
-                  value={brushColor}
-                  onChange={(event) => setBrushColor(event.target.value)}
-                  className="h-8 w-10 cursor-pointer rounded border border-white/40 bg-transparent"
-                />
-              </label>
+            <div className="mx-auto mt-4 w-full max-w-[760px]">
+              <div className="grid gap-3 md:grid-cols-[auto_auto_auto] md:items-start md:justify-center">
+                <div className="w-[252px] max-w-full rounded-lg border border-white/30 bg-[#1f2b43]/88 px-2.5 py-2">
+                  <div className="mx-auto grid w-fit grid-cols-11 gap-0.5">
+                    {DRAW_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        title={color}
+                        className={`h-[18px] w-[18px] rounded-[4px] border transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                          brushColor === color
+                            ? "border-white/25 ring-2 ring-sky-400"
+                            : "border-white/25"
+                        }`}
+                        style={{ backgroundColor: color }}
+                        onClick={() => setBrushColor(color)}
+                      />
+                    ))}
+                  </div>
+                </div>
 
-              <label className="flex items-center gap-2 text-sm font-semibold">
-                Size
-                <input
-                  type="range"
-                  min={2}
-                  max={24}
-                  step={1}
-                  value={brushSize}
-                  onChange={(event) => setBrushSize(Number(event.target.value))}
-                />
-                <span>{brushSize}px</span>
-              </label>
+                <div className="w-[252px] max-w-full rounded-lg border border-white/30 bg-[#1f2b43]/88 px-2.5 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      title="Brush"
+                      aria-label="Brush"
+                      className={`flex h-10 w-10 items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                        activeTool === "brush" ? "bg-sky-500 text-white" : "bg-white/15 text-white"
+                      }`}
+                      onClick={() => setActiveTool("brush")}
+                    >
+                      <BrushIcon className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Eraser"
+                      aria-label="Eraser"
+                      className={`flex h-10 w-10 items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                        activeTool === "eraser" ? "bg-sky-500 text-white" : "bg-white/15 text-white"
+                      }`}
+                      onClick={() => setActiveTool("eraser")}
+                    >
+                      <EraserIcon className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Bucket"
+                      aria-label="Bucket"
+                      className={`flex h-10 w-10 items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                        activeTool === "bucket" ? "bg-sky-500 text-white" : "bg-white/15 text-white"
+                      }`}
+                      onClick={() => setActiveTool("bucket")}
+                    >
+                      <BucketIcon className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Undo"
+                      aria-label="Undo"
+                      className={`flex h-10 w-10 items-center justify-center rounded-md text-white transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                        activeAction === "undo" ? "bg-sky-500" : "bg-white/15"
+                      }`}
+                      onClick={handleUndo}
+                    >
+                      <UndoIcon className="h-5 w-5" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Delete"
+                      aria-label="Delete"
+                      className={`flex h-10 w-10 items-center justify-center rounded-md text-white transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                        activeAction === "delete" ? "bg-sky-500" : "bg-white/15"
+                      }`}
+                      onClick={handleClearCanvas}
+                    >
+                      <TrashIcon className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
 
-              <button
-                type="button"
-                className="rounded bg-[#ff5a4a] px-3 py-1 text-sm font-bold uppercase tracking-wide text-white transition hover:bg-[#ff4a3a]"
-                onClick={handleClearCanvas}
-              >
-                Clear Canvas
-              </button>
+                <div className="w-[252px] max-w-full rounded-lg border border-white/30 bg-[#1f2b43]/88 px-2.5 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    {THICKNESS_OPTIONS.map((sizeOption) => (
+                      <button
+                        key={sizeOption}
+                        type="button"
+                        title={`${sizeOption}px`}
+                        className={`flex h-10 w-10 items-center justify-center rounded-md bg-white/15 transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                          brushSize === sizeOption ? "ring-2 ring-sky-400" : ""
+                        }`}
+                        onClick={() => setBrushSize(sizeOption)}
+                      >
+                        <span
+                          className="rounded-full bg-white"
+                          style={{
+                            width: Math.max(4, Math.min(18, sizeOption)),
+                            height: Math.max(4, Math.min(18, sizeOption))
+                          }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <p className="mt-4 text-center text-sm font-semibold text-white/90">

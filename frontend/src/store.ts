@@ -7,7 +7,7 @@ type GamePhase = "lobby" | "playing";
 type MessageType = "guess" | "system";
 
 export type StrokePoint = { x: number; y: number };
-export type Stroke = { id: string; color: string; size: number; points: StrokePoint[] };
+export type Stroke = { id: string; mode: "stroke" | "fill"; color: string; size: number; points: StrokePoint[] };
 export type ChatMessage = { id: string; type: MessageType; username: string; text: string; ts: number };
 export type PlayerScore = { name: string; score: number };
 
@@ -44,9 +44,10 @@ type GuessPayload = GameActionPayload & {
 
 type SendStrokePayload = GameActionPayload & {
   stroke: {
+    mode: "stroke" | "fill";
     color: string;
     size: number;
-    points: StrokePoint[];
+    points?: StrokePoint[];
   };
 };
 
@@ -226,6 +227,23 @@ export const clearCanvas = createAsyncThunk<void, GameActionPayload, { rejectVal
   }
 );
 
+export const undoStroke = createAsyncThunk<void, GameActionPayload, { rejectValue: string }>(
+  "connection/undoStroke",
+  async ({ roomId, username }, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${encodeURIComponent(roomId)}/undo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username })
+      });
+      await parseApiResponse<{ ok: boolean }>(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to undo";
+      return rejectWithValue(message);
+    }
+  }
+);
+
 const connectionSlice = createSlice({
   name: "connection",
   initialState,
@@ -308,6 +326,9 @@ const connectionSlice = createSlice({
       })
       .addCase(clearCanvas.rejected, (state, action) => {
         state.error = action.payload || "Unable to clear canvas";
+      })
+      .addCase(undoStroke.rejected, (state, action) => {
+        state.error = action.payload || "Unable to undo";
       });
   }
 });
