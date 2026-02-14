@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks";
-import { fetchRoom, leaveLobby } from "../store";
+import { fetchRoom, leaveLobby, startGame } from "../store";
 
-const LOBBY_REFRESH_MS = 2000;
+const LOBBY_REFRESH_MS = 1200;
 const SESSION_KEY = "scribble_squad_tab_session";
 
 type LobbyProps = {
@@ -28,22 +28,33 @@ async function copyToClipboard(value: string) {
 
 export default function Lobby({ routeRoomId }: LobbyProps) {
   const dispatch = useAppDispatch();
-  const { roomId, username, players, error } = useAppSelector((state) => state.connection);
+  const {
+    roomId,
+    username,
+    players,
+    host,
+    phase,
+    status,
+    error
+  } = useAppSelector((state) => state.connection);
+
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const displayRoomId = roomId || routeRoomId || "";
+  const isHost = host.toLowerCase() === username.toLowerCase();
+  const canStart = isHost && players.length >= 2 && phase !== "playing" && status !== "loading";
 
   useEffect(() => {
-    if (!roomId) {
+    if (!displayRoomId || !username) {
       return;
     }
 
-    void dispatch(fetchRoom({ roomId }));
+    void dispatch(fetchRoom({ roomId: displayRoomId, username }));
     const timerId = window.setInterval(() => {
-      void dispatch(fetchRoom({ roomId }));
+      void dispatch(fetchRoom({ roomId: displayRoomId, username }));
     }, LOBBY_REFRESH_MS);
 
     return () => window.clearInterval(timerId);
-  }, [dispatch, roomId]);
+  }, [dispatch, displayRoomId, username]);
 
   useEffect(() => {
     if (copyState === "idle") {
@@ -69,10 +80,19 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
   function handleGoHome() {
     try {
       window.sessionStorage.removeItem(SESSION_KEY);
+      window.history.replaceState(null, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
     } catch {
       // ignore storage write failures
     }
     dispatch(leaveLobby());
+  }
+
+  function handleStartGame() {
+    if (!canStart) {
+      return;
+    }
+    void dispatch(startGame({ roomId: displayRoomId, username }));
   }
 
   return (
@@ -103,21 +123,21 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
 
         <section className="mt-6 rounded-lg bg-zinc-100 p-4 shadow-[0_12px_25px_rgba(0,0,0,0.15)] sm:p-6">
           <ul className="max-h-[48vh] overflow-y-auto">
-            {players.map((player, index) => (
+            {players.map((player) => (
               <li
-                key={`${player}-${index}`}
+                key={player.name}
                 className="flex items-center justify-between border-b border-zinc-400 py-4 last:border-b-0"
               >
                 <div className="flex items-center gap-3">
                   <span className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-300 text-sm font-bold uppercase text-zinc-700">
-                    {player.slice(0, 1)}
+                    {player.name.slice(0, 1)}
                   </span>
                   <span className="text-2xl font-semibold text-zinc-800">
-                    {player}
-                    {player.toLowerCase() === username.toLowerCase() ? " (you)" : ""}
+                    {player.name}
+                    {player.name.toLowerCase() === username.toLowerCase() ? " (you)" : ""}
                   </span>
                 </div>
-                {index === 0 && (
+                {player.name.toLowerCase() === host.toLowerCase() && (
                   <span className="rounded bg-orange-500 px-2 py-1 text-xs font-bold uppercase tracking-wide text-white">
                     Host
                   </span>
@@ -130,11 +150,23 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
 
         <button
           type="button"
-          className="mt-5 w-full bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition hover:bg-[#ff4c3a]"
+          className="mt-5 w-full bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition enabled:hover:bg-[#ff4c3a] disabled:cursor-not-allowed disabled:opacity-65"
+          disabled={!canStart}
+          onClick={handleStartGame}
         >
-          Start Game
+          {isHost ? (status === "loading" ? "Starting..." : "Start Game") : "Waiting For Host..."}
         </button>
 
+        {!isHost && (
+          <p className="mt-3 text-sm font-semibold text-white/90">
+            Only the host can start the game.
+          </p>
+        )}
+        {isHost && players.length < 2 && (
+          <p className="mt-3 text-sm font-semibold text-white/90">
+            At least 2 players are required to start.
+          </p>
+        )}
         {error && <p className="mt-4 text-sm font-semibold text-red-100">{error}</p>}
       </main>
     </div>

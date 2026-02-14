@@ -3,13 +3,25 @@ import { configureStore, createAsyncThunk, createSlice, type PayloadAction } fro
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 type SessionStatus = "idle" | "loading" | "connected" | "error";
+type GamePhase = "lobby" | "playing";
+type MessageType = "guess" | "system";
 
-type ConnectionState = {
-  status: SessionStatus;
-  username: string;
+export type StrokePoint = { x: number; y: number };
+export type Stroke = { id: string; color: string; size: number; points: StrokePoint[] };
+export type ChatMessage = { id: string; type: MessageType; username: string; text: string; ts: number };
+export type PlayerScore = { name: string; score: number };
+
+export type RoomSnapshot = {
   roomId: string;
-  players: string[];
-  error: string | null;
+  phase: GamePhase;
+  host: string;
+  drawer: string | null;
+  players: PlayerScore[];
+  wordDisplay: string;
+  canDraw: boolean;
+  guessedPlayers: string[];
+  messages: ChatMessage[];
+  strokes: Stroke[];
 };
 
 type JoinGamePayload = {
@@ -21,22 +33,56 @@ type CreateGamePayload = {
   username: string;
 };
 
-type RoomResponse = {
+type GameActionPayload = {
   roomId: string;
   username: string;
-  players: string[];
 };
 
-type RoomDetailsResponse = {
+type GuessPayload = GameActionPayload & {
+  text: string;
+};
+
+type SendStrokePayload = GameActionPayload & {
+  stroke: {
+    color: string;
+    size: number;
+    points: StrokePoint[];
+  };
+};
+
+type JoinOrCreateResponse = RoomSnapshot & {
+  username: string;
+};
+
+type ConnectionState = {
+  status: SessionStatus;
+  username: string;
   roomId: string;
-  players: string[];
+  phase: GamePhase;
+  host: string;
+  drawer: string | null;
+  players: PlayerScore[];
+  wordDisplay: string;
+  canDraw: boolean;
+  guessedPlayers: string[];
+  messages: ChatMessage[];
+  strokes: Stroke[];
+  error: string | null;
 };
 
 const initialState: ConnectionState = {
   status: "idle",
   username: "",
   roomId: "",
+  phase: "lobby",
+  host: "",
+  drawer: null,
   players: [],
+  wordDisplay: "",
+  canDraw: false,
+  guessedPlayers: [],
+  messages: [],
+  strokes: [],
   error: null
 };
 
@@ -50,7 +96,20 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
   return data as T;
 }
 
-export const joinGame = createAsyncThunk<RoomResponse, JoinGamePayload, { rejectValue: string }>(
+function applySnapshot(state: ConnectionState, snapshot: RoomSnapshot) {
+  state.roomId = snapshot.roomId;
+  state.phase = snapshot.phase;
+  state.host = snapshot.host;
+  state.drawer = snapshot.drawer;
+  state.players = snapshot.players;
+  state.wordDisplay = snapshot.wordDisplay;
+  state.canDraw = snapshot.canDraw;
+  state.guessedPlayers = snapshot.guessedPlayers;
+  state.messages = snapshot.messages;
+  state.strokes = snapshot.strokes;
+}
+
+export const joinGame = createAsyncThunk<JoinOrCreateResponse, JoinGamePayload, { rejectValue: string }>(
   "connection/joinGame",
   async ({ roomId, username }, { rejectWithValue }) => {
     try {
@@ -59,7 +118,7 @@ export const joinGame = createAsyncThunk<RoomResponse, JoinGamePayload, { reject
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ roomId, username })
       });
-      return await parseApiResponse<RoomResponse>(response);
+      return await parseApiResponse<JoinOrCreateResponse>(response);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to join game";
       return rejectWithValue(message);
@@ -67,7 +126,7 @@ export const joinGame = createAsyncThunk<RoomResponse, JoinGamePayload, { reject
   }
 );
 
-export const createGame = createAsyncThunk<RoomResponse, CreateGamePayload, { rejectValue: string }>(
+export const createGame = createAsyncThunk<JoinOrCreateResponse, CreateGamePayload, { rejectValue: string }>(
   "connection/createGame",
   async ({ username }, { rejectWithValue }) => {
     try {
@@ -76,7 +135,7 @@ export const createGame = createAsyncThunk<RoomResponse, CreateGamePayload, { re
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username })
       });
-      return await parseApiResponse<RoomResponse>(response);
+      return await parseApiResponse<JoinOrCreateResponse>(response);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to create game";
       return rejectWithValue(message);
@@ -84,14 +143,84 @@ export const createGame = createAsyncThunk<RoomResponse, CreateGamePayload, { re
   }
 );
 
-export const fetchRoom = createAsyncThunk<RoomDetailsResponse, { roomId: string }, { rejectValue: string }>(
+export const fetchRoom = createAsyncThunk<RoomSnapshot, GameActionPayload, { rejectValue: string }>(
   "connection/fetchRoom",
-  async ({ roomId }, { rejectWithValue }) => {
+  async ({ roomId, username }, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/rooms/${encodeURIComponent(roomId)}`);
-      return await parseApiResponse<RoomDetailsResponse>(response);
+      const response = await fetch(
+        `${API_BASE_URL}/api/rooms/${encodeURIComponent(roomId)}?username=${encodeURIComponent(username)}`
+      );
+      return await parseApiResponse<RoomSnapshot>(response);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to fetch room";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const startGame = createAsyncThunk<RoomSnapshot, GameActionPayload, { rejectValue: string }>(
+  "connection/startGame",
+  async ({ roomId, username }, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${encodeURIComponent(roomId)}/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username })
+      });
+      return await parseApiResponse<RoomSnapshot>(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to start game";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const sendGuess = createAsyncThunk<RoomSnapshot, GuessPayload, { rejectValue: string }>(
+  "connection/sendGuess",
+  async ({ roomId, username, text }, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${encodeURIComponent(roomId)}/guess`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, text })
+      });
+      return await parseApiResponse<RoomSnapshot>(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to send guess";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const sendStroke = createAsyncThunk<void, SendStrokePayload, { rejectValue: string }>(
+  "connection/sendStroke",
+  async ({ roomId, username, stroke }, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${encodeURIComponent(roomId)}/strokes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, stroke })
+      });
+      await parseApiResponse<{ ok: boolean }>(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to send stroke";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const clearCanvas = createAsyncThunk<void, GameActionPayload, { rejectValue: string }>(
+  "connection/clearCanvas",
+  async ({ roomId, username }, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${encodeURIComponent(roomId)}/clear`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username })
+      });
+      await parseApiResponse<{ ok: boolean }>(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to clear canvas";
       return rejectWithValue(message);
     }
   }
@@ -113,12 +242,7 @@ const connectionSlice = createSlice({
         state.status = "error";
       }
     },
-    leaveLobby: () => {
-      return {
-        ...initialState,
-        players: []
-      };
-    }
+    leaveLobby: () => ({ ...initialState })
   },
   extraReducers: (builder) => {
     builder
@@ -128,9 +252,8 @@ const connectionSlice = createSlice({
       })
       .addCase(joinGame.fulfilled, (state, action) => {
         state.status = "connected";
-        state.roomId = action.payload.roomId;
         state.username = action.payload.username;
-        state.players = action.payload.players;
+        applySnapshot(state, action.payload);
         state.error = null;
       })
       .addCase(joinGame.rejected, (state, action) => {
@@ -143,9 +266,8 @@ const connectionSlice = createSlice({
       })
       .addCase(createGame.fulfilled, (state, action) => {
         state.status = "connected";
-        state.roomId = action.payload.roomId;
         state.username = action.payload.username;
-        state.players = action.payload.players;
+        applySnapshot(state, action.payload);
         state.error = null;
       })
       .addCase(createGame.rejected, (state, action) => {
@@ -154,12 +276,38 @@ const connectionSlice = createSlice({
       })
       .addCase(fetchRoom.fulfilled, (state, action) => {
         if (state.roomId === action.payload.roomId) {
-          state.players = action.payload.players;
+          applySnapshot(state, action.payload);
           state.error = null;
         }
       })
       .addCase(fetchRoom.rejected, (state, action) => {
-        state.error = action.payload || "Unable to refresh lobby";
+        state.error = action.payload || "Unable to refresh room";
+      })
+      .addCase(startGame.pending, (state) => {
+        state.status = "loading";
+        state.error = null;
+      })
+      .addCase(startGame.fulfilled, (state, action) => {
+        state.status = "connected";
+        applySnapshot(state, action.payload);
+        state.error = null;
+      })
+      .addCase(startGame.rejected, (state, action) => {
+        state.status = "connected";
+        state.error = action.payload || "Unable to start game";
+      })
+      .addCase(sendGuess.fulfilled, (state, action) => {
+        applySnapshot(state, action.payload);
+        state.error = null;
+      })
+      .addCase(sendGuess.rejected, (state, action) => {
+        state.error = action.payload || "Unable to send guess";
+      })
+      .addCase(sendStroke.rejected, (state, action) => {
+        state.error = action.payload || "Unable to draw";
+      })
+      .addCase(clearCanvas.rejected, (state, action) => {
+        state.error = action.payload || "Unable to clear canvas";
       });
   }
 });
