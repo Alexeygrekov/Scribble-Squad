@@ -248,6 +248,14 @@ const connectionSlice = createSlice({
   name: "connection",
   initialState,
   reducers: {
+    applyRoomSnapshot: (state, action: PayloadAction<RoomSnapshot>) => {
+      if (state.roomId && state.roomId !== action.payload.roomId) {
+        return;
+      }
+      state.status = "connected";
+      applySnapshot(state, action.payload);
+      state.error = null;
+    },
     clearError: (state) => {
       state.error = null;
       if (state.status === "error" && !state.roomId) {
@@ -333,7 +341,7 @@ const connectionSlice = createSlice({
   }
 });
 
-export const { clearError, setError, leaveLobby } = connectionSlice.actions;
+export const { applyRoomSnapshot, clearError, setError, leaveLobby } = connectionSlice.actions;
 
 export const store = configureStore({
   reducer: {

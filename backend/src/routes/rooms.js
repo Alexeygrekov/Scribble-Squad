@@ -27,11 +27,12 @@ const __dirname = path.dirname(__filename);
 const ROOMS_STORE_FILE = path.resolve(__dirname, "../../.runtime/rooms.json");
 
 let persistTimer = null;
+const roomUpdateSubscribers = new Set();
 
 function normalizePersistedRoom(rawRoom) {
   const roomId = String(rawRoom?.id || "").trim().toUpperCase();
-  const host = String(rawRoom?.host || "").trim();
-  if (!roomId || !host) {
+  const creator = String(rawRoom?.creator || rawRoom?.host || "").trim();
+  if (!roomId || !creator) {
     return null;
   }
 
@@ -39,8 +40,8 @@ function normalizePersistedRoom(rawRoom) {
     ? rawRoom.players.map((player) => String(player || "").trim()).filter(Boolean)
     : [];
 
-  if (!playerNames.some((player) => player.toLowerCase() === host.toLowerCase())) {
-    playerNames.unshift(host);
+  if (!playerNames.some((player) => player.toLowerCase() === creator.toLowerCase())) {
+    playerNames.unshift(creator);
   }
 
   const players = Array.from(new Set(playerNames));
@@ -103,7 +104,8 @@ function normalizePersistedRoom(rawRoom) {
   return {
     id: roomId,
     phase: rawRoom?.phase === "playing" ? "playing" : "lobby",
-    host,
+    creator,
+    host: creator,
     drawer,
     word: typeof rawRoom?.word === "string" ? rawRoom.word : "",
     players,
@@ -162,6 +164,35 @@ function scheduleRoomsPersist() {
   }, 120);
 }
 
+function notifyRoomUpdated(roomId) {
+  roomUpdateSubscribers.forEach((listener) => {
+    try {
+      listener(roomId);
+    } catch {
+      // keep notifications best-effort
+    }
+  });
+}
+
+export function subscribeRoomUpdates(listener) {
+  roomUpdateSubscribers.add(listener);
+  return () => {
+    roomUpdateSubscribers.delete(listener);
+  };
+}
+
+export function getRoomSnapshot(roomId, viewerUsername = "") {
+  const normalizedRoomId = String(roomId || "").trim().toUpperCase();
+  if (!normalizedRoomId) {
+    return null;
+  }
+  const room = rooms.get(normalizedRoomId);
+  if (!room) {
+    return null;
+  }
+  return serializeRoom(room, viewerUsername);
+}
+
 function generateRoomId() {
   let roomId = "";
   for (let index = 0; index < ROOM_ID_LENGTH; index += 1) {
@@ -216,6 +247,7 @@ function pickWord() {
 function serializeRoom(room, viewerUsername = "") {
   const normalizedViewer = String(viewerUsername || "").trim().toLowerCase();
   const isDrawer = normalizedViewer && room.drawer?.toLowerCase() === normalizedViewer;
+  const hostName = room.creator || room.host;
   const wordDisplay = room.phase === "playing"
     ? (isDrawer ? room.word : maskWord(room.word))
     : "";
@@ -223,7 +255,7 @@ function serializeRoom(room, viewerUsername = "") {
   return {
     roomId: room.id,
     phase: room.phase,
-    host: room.host,
+    host: hostName,
     drawer: room.drawer,
     players: [...room.players]
       .map((name) => ({ name, score: room.scores[name] || 0 }))
@@ -272,6 +304,7 @@ router.post("/create", (req, res) => {
   const room = {
     id: roomId,
     phase: "lobby",
+    creator: username,
     host: username,
     drawer: null,
     word: "",
@@ -285,6 +318,7 @@ router.post("/create", (req, res) => {
 
   rooms.set(roomId, room);
   writePersistedRooms();
+  notifyRoomUpdated(roomId);
   res.status(201).json({ ...serializeRoom(room, username), username });
 });
 
@@ -310,6 +344,7 @@ router.post("/join", (req, res) => {
     room.players.push(username);
     room.scores[username] = room.scores[username] || 0;
     writePersistedRooms();
+    notifyRoomUpdated(roomId);
   }
 
   res.json({
@@ -341,13 +376,14 @@ router.post("/:roomId/start", (req, res) => {
     res.status(403).json({ error: "You are not in this room." });
     return;
   }
-  if (room.host.toLowerCase() !== resolvedPlayer.toLowerCase()) {
+  const hostName = room.creator || room.host;
+  if (hostName.toLowerCase() !== resolvedPlayer.toLowerCase()) {
     res.status(403).json({ error: "Only the host can start the game." });
     return;
   }
 
   room.phase = "playing";
-  room.drawer = room.host;
+  room.drawer = hostName;
   room.word = pickWord();
   room.strokes = [];
   room.guessedPlayers = new Set();
@@ -355,6 +391,7 @@ router.post("/:roomId/start", (req, res) => {
     buildMessage("system", "System", "Round started. Start guessing!")
   ];
   writePersistedRooms();
+  notifyRoomUpdated(roomId);
 
   res.json(serializeRoom(room, resolvedPlayer));
 });
@@ -411,6 +448,7 @@ router.post("/:roomId/guess", (req, res) => {
   }
 
   writePersistedRooms();
+  notifyRoomUpdated(roomId);
 
   res.json(serializeRoom(room, resolvedPlayer));
 });
@@ -461,6 +499,7 @@ router.post("/:roomId/strokes", (req, res) => {
     room.strokes = room.strokes.slice(room.strokes.length - 800);
   }
   scheduleRoomsPersist();
+  notifyRoomUpdated(roomId);
 
   res.status(201).json({ ok: true });
 });
@@ -488,6 +527,7 @@ router.post("/:roomId/undo", (req, res) => {
   if (room.strokes.length > 0) {
     room.strokes.pop();
     writePersistedRooms();
+    notifyRoomUpdated(roomId);
   }
 
   res.json({ ok: true });
@@ -515,6 +555,7 @@ router.post("/:roomId/clear", (req, res) => {
 
   room.strokes = [];
   writePersistedRooms();
+  notifyRoomUpdated(roomId);
   res.json({ ok: true });
 });
 

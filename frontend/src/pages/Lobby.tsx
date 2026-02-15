@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks";
-import { fetchRoom, leaveLobby, startGame } from "../store";
+import { leaveLobby, startGame } from "../store";
+import { useRoomSocket } from "../useRoomSocket";
 
-const LOBBY_REFRESH_MS = 1200;
 const SESSION_KEY = "scribble_squad_tab_session";
 const ROOM_NOT_FOUND_ERROR = "Room not found.";
 
@@ -44,18 +44,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
   const isHost = host.toLowerCase() === username.toLowerCase();
   const canStart = isHost && players.length >= 2 && phase !== "playing" && status !== "loading";
 
-  useEffect(() => {
-    if (!displayRoomId || !username) {
-      return;
-    }
-
-    void dispatch(fetchRoom({ roomId: displayRoomId, username }));
-    const timerId = window.setInterval(() => {
-      void dispatch(fetchRoom({ roomId: displayRoomId, username }));
-    }, LOBBY_REFRESH_MS);
-
-    return () => window.clearInterval(timerId);
-  }, [dispatch, displayRoomId, username]);
+  useRoomSocket({ roomId: displayRoomId, username });
 
   useEffect(() => {
     if (copyState === "idle") {

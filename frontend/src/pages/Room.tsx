@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks";
-import { clearCanvas, fetchRoom, leaveLobby, sendGuess, sendStroke, undoStroke, type StrokePoint } from "../store";
+import { clearCanvas, leaveLobby, sendGuess, sendStroke, undoStroke, type StrokePoint } from "../store";
+import { useRoomSocket } from "../useRoomSocket";
 
-const ROOM_REFRESH_MS = 900;
 const SESSION_KEY = "scribble_squad_tab_session";
 const ROOM_NOT_FOUND_ERROR = "Room not found.";
 const CANVAS_WIDTH = 760;
@@ -147,18 +147,7 @@ export default function Room({ routeRoomId }: RoomProps) {
   const activeStrokeColor = activeTool === "eraser" ? CANVAS_BACKGROUND : brushColor;
   const drawerCursor = useMemo(() => createCursorDot(brushColor, brushSize), [brushColor, brushSize]);
 
-  useEffect(() => {
-    if (!displayRoomId || !username) {
-      return;
-    }
-
-    void dispatch(fetchRoom({ roomId: displayRoomId, username }));
-    const timerId = window.setInterval(() => {
-      void dispatch(fetchRoom({ roomId: displayRoomId, username }));
-    }, ROOM_REFRESH_MS);
-
-    return () => window.clearInterval(timerId);
-  }, [dispatch, displayRoomId, username]);
+  useRoomSocket({ roomId: displayRoomId, username });
 
   useEffect(() => {
     const chatElement = chatListRef.current;
@@ -317,7 +306,6 @@ export default function Room({ routeRoomId }: RoomProps) {
       setActiveAction((current) => (current === "delete" ? null : current));
     }, 220);
     void dispatch(clearCanvas({ roomId: displayRoomId, username }));
-    void dispatch(fetchRoom({ roomId: displayRoomId, username }));
   }
 
   function handleUndo() {
@@ -329,7 +317,6 @@ export default function Room({ routeRoomId }: RoomProps) {
       setActiveAction((current) => (current === "undo" ? null : current));
     }, 220);
     void dispatch(undoStroke({ roomId: displayRoomId, username }));
-    void dispatch(fetchRoom({ roomId: displayRoomId, username }));
   }
 
   function handleGoHome() {
