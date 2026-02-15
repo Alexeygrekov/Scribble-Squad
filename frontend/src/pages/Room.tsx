@@ -4,6 +4,7 @@ import { clearCanvas, fetchRoom, leaveLobby, sendGuess, sendStroke, undoStroke, 
 
 const ROOM_REFRESH_MS = 900;
 const SESSION_KEY = "scribble_squad_tab_session";
+const ROOM_NOT_FOUND_ERROR = "Room not found.";
 const CANVAS_WIDTH = 760;
 const CANVAS_HEIGHT = 520;
 const CANVAS_BACKGROUND = "#ececec";
@@ -166,6 +167,20 @@ export default function Room({ routeRoomId }: RoomProps) {
     }
     chatElement.scrollTop = chatElement.scrollHeight;
   }, [messages.length]);
+
+  useEffect(() => {
+    if (error !== ROOM_NOT_FOUND_ERROR) {
+      return;
+    }
+    try {
+      window.sessionStorage.removeItem(SESSION_KEY);
+      window.history.replaceState(null, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    } catch {
+      // ignore storage write failures
+    }
+    dispatch(leaveLobby());
+  }, [dispatch, error]);
 
   useEffect(() => {
     const canvas = canvasRef.current;

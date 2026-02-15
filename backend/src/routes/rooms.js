@@ -1,5 +1,8 @@
 import { randomInt } from "crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
+import path from "path";
 import { Router } from "express";
+import { fileURLToPath } from "url";
 
 const router = Router();
 
@@ -18,6 +21,146 @@ const WORDS = [
   "piano",
   "rocket"
 ];
+const STORAGE_FILE_VERSION = 1;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const ROOMS_STORE_FILE = path.resolve(__dirname, "../../.runtime/rooms.json");
+
+let persistTimer = null;
+
+function normalizePersistedRoom(rawRoom) {
+  const roomId = String(rawRoom?.id || "").trim().toUpperCase();
+  const host = String(rawRoom?.host || "").trim();
+  if (!roomId || !host) {
+    return null;
+  }
+
+  const playerNames = Array.isArray(rawRoom?.players)
+    ? rawRoom.players.map((player) => String(player || "").trim()).filter(Boolean)
+    : [];
+
+  if (!playerNames.some((player) => player.toLowerCase() === host.toLowerCase())) {
+    playerNames.unshift(host);
+  }
+
+  const players = Array.from(new Set(playerNames));
+  if (players.length === 0) {
+    return null;
+  }
+
+  const scores = {};
+  players.forEach((player) => {
+    const score = Number(rawRoom?.scores?.[player]);
+    scores[player] = Number.isFinite(score) ? score : 0;
+  });
+
+  const guessedPlayers = Array.isArray(rawRoom?.guessedPlayers)
+    ? rawRoom.guessedPlayers
+      .map((player) => String(player || "").trim())
+      .filter((player) => players.some((name) => name.toLowerCase() === player.toLowerCase()))
+    : [];
+
+  const messages = Array.isArray(rawRoom?.messages)
+    ? rawRoom.messages
+      .map((message) => {
+        const text = String(message?.text || "").trim();
+        if (!text) {
+          return null;
+        }
+        return {
+          id: typeof message?.id === "string" ? message.id : `msg_${Date.now()}_${randomInt(1000, 9999)}`,
+          type: message?.type === "system" ? "system" : "guess",
+          username: String(message?.username || "System").trim() || "System",
+          text,
+          ts: Number.isFinite(Number(message?.ts)) ? Number(message.ts) : Date.now()
+        };
+      })
+      .filter(Boolean)
+    : [];
+
+  const strokes = Array.isArray(rawRoom?.strokes)
+    ? rawRoom.strokes
+      .map((stroke) => {
+        const mode = stroke?.mode === "fill" ? "fill" : "stroke";
+        const points = sanitizePoints(stroke?.points);
+        if (mode === "stroke" && points.length < 2) {
+          return null;
+        }
+        return {
+          id: typeof stroke?.id === "string" ? stroke.id : `stroke_${Date.now()}_${randomInt(1000, 9999)}`,
+          mode,
+          color: typeof stroke?.color === "string" ? stroke.color : "#f55a42",
+          size: Math.max(1, Math.min(24, Number(stroke?.size) || 4)),
+          points
+        };
+      })
+      .filter(Boolean)
+    : [];
+
+  const drawerCandidate = String(rawRoom?.drawer || "").trim();
+  const drawer = players.find((player) => player.toLowerCase() === drawerCandidate.toLowerCase()) || null;
+
+  return {
+    id: roomId,
+    phase: rawRoom?.phase === "playing" ? "playing" : "lobby",
+    host,
+    drawer,
+    word: typeof rawRoom?.word === "string" ? rawRoom.word : "",
+    players,
+    scores,
+    guessedPlayers: new Set(guessedPlayers),
+    messages,
+    strokes,
+    createdAt: Number.isFinite(Number(rawRoom?.createdAt)) ? Number(rawRoom.createdAt) : Date.now()
+  };
+}
+
+function readPersistedRooms() {
+  try {
+    const raw = readFileSync(ROOMS_STORE_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    const storedRooms = Array.isArray(parsed?.rooms) ? parsed.rooms : [];
+
+    storedRooms.forEach((rawRoom) => {
+      const normalizedRoom = normalizePersistedRoom(rawRoom);
+      if (normalizedRoom) {
+        rooms.set(normalizedRoom.id, normalizedRoom);
+      }
+    });
+  } catch {
+    // no persisted rooms available yet
+  }
+}
+
+function writePersistedRooms() {
+  try {
+    mkdirSync(path.dirname(ROOMS_STORE_FILE), { recursive: true });
+
+    const payload = {
+      version: STORAGE_FILE_VERSION,
+      savedAt: Date.now(),
+      rooms: Array.from(rooms.values()).map((room) => ({
+        ...room,
+        guessedPlayers: Array.from(room.guessedPlayers)
+      }))
+    };
+
+    writeFileSync(ROOMS_STORE_FILE, JSON.stringify(payload), "utf8");
+  } catch {
+    // keep API running even if persistence fails
+  }
+}
+
+function scheduleRoomsPersist() {
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+  }
+
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    writePersistedRooms();
+  }, 120);
+}
 
 function generateRoomId() {
   let roomId = "";
@@ -93,6 +236,8 @@ function serializeRoom(room, viewerUsername = "") {
   };
 }
 
+readPersistedRooms();
+
 router.get("/", (_req, res) => {
   const roomSummaries = Array.from(rooms.values()).map((room) => ({
     roomId: room.id,
@@ -139,6 +284,7 @@ router.post("/create", (req, res) => {
   };
 
   rooms.set(roomId, room);
+  writePersistedRooms();
   res.status(201).json({ ...serializeRoom(room, username), username });
 });
 
@@ -163,6 +309,7 @@ router.post("/join", (req, res) => {
   if (!existingPlayer) {
     room.players.push(username);
     room.scores[username] = room.scores[username] || 0;
+    writePersistedRooms();
   }
 
   res.json({
@@ -207,6 +354,7 @@ router.post("/:roomId/start", (req, res) => {
   room.messages = [
     buildMessage("system", "System", "Round started. Start guessing!")
   ];
+  writePersistedRooms();
 
   res.json(serializeRoom(room, resolvedPlayer));
 });
@@ -262,6 +410,8 @@ router.post("/:roomId/guess", (req, res) => {
     );
   }
 
+  writePersistedRooms();
+
   res.json(serializeRoom(room, resolvedPlayer));
 });
 
@@ -310,6 +460,7 @@ router.post("/:roomId/strokes", (req, res) => {
   if (room.strokes.length > 800) {
     room.strokes = room.strokes.slice(room.strokes.length - 800);
   }
+  scheduleRoomsPersist();
 
   res.status(201).json({ ok: true });
 });
@@ -336,6 +487,7 @@ router.post("/:roomId/undo", (req, res) => {
 
   if (room.strokes.length > 0) {
     room.strokes.pop();
+    writePersistedRooms();
   }
 
   res.json({ ok: true });
@@ -362,6 +514,7 @@ router.post("/:roomId/clear", (req, res) => {
   }
 
   room.strokes = [];
+  writePersistedRooms();
   res.json({ ok: true });
 });
 

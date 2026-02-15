@@ -4,6 +4,7 @@ import { fetchRoom, leaveLobby, startGame } from "../store";
 
 const LOBBY_REFRESH_MS = 1200;
 const SESSION_KEY = "scribble_squad_tab_session";
+const ROOM_NOT_FOUND_ERROR = "Room not found.";
 
 type LobbyProps = {
   routeRoomId?: string;
@@ -64,6 +65,20 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
     const timerId = window.setTimeout(() => setCopyState("idle"), 1800);
     return () => window.clearTimeout(timerId);
   }, [copyState]);
+
+  useEffect(() => {
+    if (error !== ROOM_NOT_FOUND_ERROR) {
+      return;
+    }
+    try {
+      window.sessionStorage.removeItem(SESSION_KEY);
+      window.history.replaceState(null, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    } catch {
+      // ignore storage write failures
+    }
+    dispatch(leaveLobby());
+  }, [dispatch, error]);
 
   async function handleCopyRoomId() {
     try {
