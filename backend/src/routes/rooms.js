@@ -9,6 +9,7 @@ const router = Router();
 const rooms = new Map();
 const ROOM_ID_LENGTH = 6;
 const ROOM_ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const CHOOSE_WORD_OPTIONS = 3;
 const WORDS = [
   "ice cream",
   "rainbow",
@@ -28,6 +29,31 @@ const ROOMS_STORE_FILE = path.resolve(__dirname, "../../.runtime/rooms.json");
 
 let persistTimer = null;
 const roomUpdateSubscribers = new Set();
+
+function pickWordChoices(count = CHOOSE_WORD_OPTIONS) {
+  if (WORDS.length === 0) {
+    return [];
+  }
+
+  const pool = [...WORDS];
+  const pickCount = Math.min(Math.max(1, count), pool.length);
+  const picks = [];
+
+  while (picks.length < pickCount) {
+    const pickedIndex = randomInt(0, pool.length);
+    picks.push(pool[pickedIndex]);
+    pool.splice(pickedIndex, 1);
+  }
+
+  return picks;
+}
+
+function pickRandomPlayer(players) {
+  if (!Array.isArray(players) || players.length === 0) {
+    return null;
+  }
+  return players[randomInt(0, players.length)];
+}
 
 function normalizePersistedRoom(rawRoom) {
   const roomId = String(rawRoom?.id || "").trim().toUpperCase();
@@ -101,13 +127,24 @@ function normalizePersistedRoom(rawRoom) {
   const drawerCandidate = String(rawRoom?.drawer || "").trim();
   const drawer = players.find((player) => player.toLowerCase() === drawerCandidate.toLowerCase()) || null;
 
+  const phase = rawRoom?.phase === "playing" || rawRoom?.phase === "choosing_word"
+    ? rawRoom.phase
+    : "lobby";
+  let wordChoices = Array.isArray(rawRoom?.wordChoices)
+    ? rawRoom.wordChoices.map((word) => String(word || "").trim()).filter(Boolean).slice(0, CHOOSE_WORD_OPTIONS)
+    : [];
+  if (phase === "choosing_word" && wordChoices.length === 0) {
+    wordChoices = pickWordChoices(CHOOSE_WORD_OPTIONS);
+  }
+
   return {
     id: roomId,
-    phase: rawRoom?.phase === "playing" ? "playing" : "lobby",
+    phase,
     creator,
     host: creator,
     drawer,
     word: typeof rawRoom?.word === "string" ? rawRoom.word : "",
+    wordChoices,
     players,
     scores,
     guessedPlayers: new Set(guessedPlayers),
@@ -240,14 +277,14 @@ function findPlayer(room, username) {
   return room.players.find((player) => player.toLowerCase() === username.toLowerCase()) || null;
 }
 
-function pickWord() {
-  return WORDS[randomInt(0, WORDS.length)];
-}
-
 function serializeRoom(room, viewerUsername = "") {
   const normalizedViewer = String(viewerUsername || "").trim().toLowerCase();
   const isDrawer = normalizedViewer && room.drawer?.toLowerCase() === normalizedViewer;
   const hostName = room.creator || room.host;
+  const canDraw = room.phase === "playing" && Boolean(isDrawer);
+  const wordChoices = room.phase === "choosing_word" && isDrawer
+    ? [...room.wordChoices]
+    : [];
   const wordDisplay = room.phase === "playing"
     ? (isDrawer ? room.word : maskWord(room.word))
     : "";
@@ -261,7 +298,8 @@ function serializeRoom(room, viewerUsername = "") {
       .map((name) => ({ name, score: room.scores[name] || 0 }))
       .sort((left, right) => right.score - left.score),
     wordDisplay,
-    canDraw: Boolean(isDrawer),
+    canDraw,
+    wordChoices,
     guessedPlayers: Array.from(room.guessedPlayers),
     messages: room.messages.map((message) => ({ ...message })),
     strokes: room.strokes.map((stroke) => ({ ...stroke, points: stroke.points.map((point) => ({ ...point })) }))
@@ -308,6 +346,7 @@ router.post("/create", (req, res) => {
     host: username,
     drawer: null,
     word: "",
+    wordChoices: [],
     players: [username],
     scores: { [username]: 0 },
     guessedPlayers: new Set(),
@@ -382,14 +421,67 @@ router.post("/:roomId/start", (req, res) => {
     return;
   }
 
-  room.phase = "playing";
-  room.drawer = hostName;
-  room.word = pickWord();
+  const pickedDrawer = pickRandomPlayer(room.players);
+  if (!pickedDrawer) {
+    res.status(500).json({ error: "Unable to select a drawer." });
+    return;
+  }
+
+  room.phase = "choosing_word";
+  room.drawer = pickedDrawer;
+  room.word = "";
+  room.wordChoices = pickWordChoices(CHOOSE_WORD_OPTIONS);
   room.strokes = [];
   room.guessedPlayers = new Set();
   room.messages = [
-    buildMessage("system", "System", "Round started. Start guessing!")
+    buildMessage("system", "System", `${room.drawer} is picking a word...`)
   ];
+  writePersistedRooms();
+  notifyRoomUpdated(roomId);
+
+  res.json(serializeRoom(room, resolvedPlayer));
+});
+
+router.post("/:roomId/choose-word", (req, res) => {
+  const roomId = String(req.params.roomId || "").trim().toUpperCase();
+  const username = String(req.body?.username || "").trim();
+  const selectedWordInput = String(req.body?.word || "").trim().toLowerCase();
+  const room = rooms.get(roomId);
+
+  if (!room) {
+    res.status(404).json({ error: "Room not found." });
+    return;
+  }
+  if (!username || !selectedWordInput) {
+    res.status(400).json({ error: "Username and word are required." });
+    return;
+  }
+  if (room.phase !== "choosing_word") {
+    res.status(400).json({ error: "Word selection is not active." });
+    return;
+  }
+
+  const resolvedPlayer = findPlayer(room, username);
+  if (!resolvedPlayer) {
+    res.status(403).json({ error: "You are not in this room." });
+    return;
+  }
+  if (room.drawer?.toLowerCase() !== resolvedPlayer.toLowerCase()) {
+    res.status(403).json({ error: "Only the drawer can choose the word." });
+    return;
+  }
+
+  const chosenWord = room.wordChoices.find((word) => word.toLowerCase() === selectedWordInput);
+  if (!chosenWord) {
+    res.status(400).json({ error: "Chosen word is not available." });
+    return;
+  }
+
+  room.phase = "playing";
+  room.word = chosenWord;
+  room.wordChoices = [];
+  room.messages.push(buildMessage("system", "System", "Round started. Start guessing!"));
+
   writePersistedRooms();
   notifyRoomUpdated(roomId);
 

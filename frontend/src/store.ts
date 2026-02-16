@@ -3,7 +3,7 @@ import { configureStore, createAsyncThunk, createSlice, type PayloadAction } fro
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 type SessionStatus = "idle" | "loading" | "connected" | "error";
-type GamePhase = "lobby" | "playing";
+type GamePhase = "lobby" | "choosing_word" | "playing";
 type MessageType = "guess" | "system";
 
 export type StrokePoint = { x: number; y: number };
@@ -18,6 +18,7 @@ export type RoomSnapshot = {
   drawer: string | null;
   players: PlayerScore[];
   wordDisplay: string;
+  wordChoices: string[];
   canDraw: boolean;
   guessedPlayers: string[];
   messages: ChatMessage[];
@@ -42,6 +43,10 @@ type GuessPayload = GameActionPayload & {
   text: string;
 };
 
+type ChooseWordPayload = GameActionPayload & {
+  word: string;
+};
+
 type SendStrokePayload = GameActionPayload & {
   stroke: {
     mode: "stroke" | "fill";
@@ -64,6 +69,7 @@ type ConnectionState = {
   drawer: string | null;
   players: PlayerScore[];
   wordDisplay: string;
+  wordChoices: string[];
   canDraw: boolean;
   guessedPlayers: string[];
   messages: ChatMessage[];
@@ -80,6 +86,7 @@ const initialState: ConnectionState = {
   drawer: null,
   players: [],
   wordDisplay: "",
+  wordChoices: [],
   canDraw: false,
   guessedPlayers: [],
   messages: [],
@@ -104,6 +111,7 @@ function applySnapshot(state: ConnectionState, snapshot: RoomSnapshot) {
   state.drawer = snapshot.drawer;
   state.players = snapshot.players;
   state.wordDisplay = snapshot.wordDisplay;
+  state.wordChoices = snapshot.wordChoices;
   state.canDraw = snapshot.canDraw;
   state.guessedPlayers = snapshot.guessedPlayers;
   state.messages = snapshot.messages;
@@ -188,6 +196,23 @@ export const sendGuess = createAsyncThunk<RoomSnapshot, GuessPayload, { rejectVa
       return await parseApiResponse<RoomSnapshot>(response);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unable to send guess";
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const chooseWord = createAsyncThunk<RoomSnapshot, ChooseWordPayload, { rejectValue: string }>(
+  "connection/chooseWord",
+  async ({ roomId, username, word }, { rejectWithValue }) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/rooms/${encodeURIComponent(roomId)}/choose-word`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, word })
+      });
+      return await parseApiResponse<RoomSnapshot>(response);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to choose word";
       return rejectWithValue(message);
     }
   }
@@ -328,6 +353,13 @@ const connectionSlice = createSlice({
       })
       .addCase(sendGuess.rejected, (state, action) => {
         state.error = action.payload || "Unable to send guess";
+      })
+      .addCase(chooseWord.fulfilled, (state, action) => {
+        applySnapshot(state, action.payload);
+        state.error = null;
+      })
+      .addCase(chooseWord.rejected, (state, action) => {
+        state.error = action.payload || "Unable to choose word";
       })
       .addCase(sendStroke.rejected, (state, action) => {
         state.error = action.payload || "Unable to draw";

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks";
-import { clearCanvas, leaveLobby, sendGuess, sendStroke, undoStroke, type StrokePoint } from "../store";
+import { chooseWord, clearCanvas, leaveLobby, sendGuess, sendStroke, undoStroke, type StrokePoint } from "../store";
 import { useRoomSocket } from "../useRoomSocket";
 
 const SESSION_KEY = "scribble_squad_tab_session";
@@ -118,7 +118,9 @@ export default function Room({ routeRoomId }: RoomProps) {
     players,
     host,
     drawer,
+    phase,
     wordDisplay,
+    wordChoices,
     canDraw,
     messages,
     strokes,
@@ -130,6 +132,7 @@ export default function Room({ routeRoomId }: RoomProps) {
   const [brushSize, setBrushSize] = useState(6);
   const [activeTool, setActiveTool] = useState<DrawTool>("brush");
   const [activeAction, setActiveAction] = useState<"undo" | "delete" | null>(null);
+  const [isChoosingWordSubmitting, setIsChoosingWordSubmitting] = useState(false);
   const [guessText, setGuessText] = useState("");
   const [isDrawing, setIsDrawing] = useState(false);
   const [liveStrokePoints, setLiveStrokePoints] = useState<StrokePoint[]>([]);
@@ -146,6 +149,16 @@ export default function Room({ routeRoomId }: RoomProps) {
   }, [canDraw, wordDisplay]);
   const activeStrokeColor = activeTool === "eraser" ? CANVAS_BACKGROUND : brushColor;
   const drawerCursor = useMemo(() => createCursorDot(brushColor, brushSize), [brushColor, brushSize]);
+  const isDrawer = Boolean(drawer) && drawer.toLowerCase() === username.toLowerCase();
+  const isChoosingWordPhase = phase === "choosing_word";
+  const isDrawerChoosingWord = isChoosingWordPhase && isDrawer;
+  const isWaitingForDrawerWord = isChoosingWordPhase && !isDrawer;
+  const canSubmitGuess = phase === "playing" && !canDraw;
+  const roomHeadingText = isDrawerChoosingWord
+    ? "Pick A Word"
+    : isWaitingForDrawerWord
+      ? "Drawer Is Choosing A Word..."
+      : (canDraw ? `Your Word: ${formattedWord}` : `Word: ${formattedWord}`);
 
   useRoomSocket({ roomId: displayRoomId, username });
 
@@ -170,6 +183,12 @@ export default function Room({ routeRoomId }: RoomProps) {
     }
     dispatch(leaveLobby());
   }, [dispatch, error]);
+
+  useEffect(() => {
+    if (!isChoosingWordPhase) {
+      setIsChoosingWordSubmitting(false);
+    }
+  }, [isChoosingWordPhase]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -284,7 +303,7 @@ export default function Room({ routeRoomId }: RoomProps) {
 
   function handleGuessSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (canDraw) {
+    if (!canSubmitGuess) {
       return;
     }
 
@@ -295,6 +314,16 @@ export default function Room({ routeRoomId }: RoomProps) {
 
     setGuessText("");
     void dispatch(sendGuess({ roomId: displayRoomId, username, text: trimmedGuess }));
+  }
+
+  function handleChooseWord(selectedWord: string) {
+    if (!isDrawerChoosingWord || !displayRoomId || !username || isChoosingWordSubmitting) {
+      return;
+    }
+
+    setIsChoosingWordSubmitting(true);
+    void dispatch(chooseWord({ roomId: displayRoomId, username, word: selectedWord }))
+      .finally(() => setIsChoosingWordSubmitting(false));
   }
 
   function handleClearCanvas() {
@@ -376,21 +405,32 @@ export default function Room({ routeRoomId }: RoomProps) {
 
         <section className="flex flex-col">
           <h2 className="text-center font-['Bebas_Neue'] text-6xl tracking-wider text-white">
-            {canDraw ? `Your Word: ${formattedWord}` : `Word: ${formattedWord}`}
+            {roomHeadingText}
           </h2>
           <div className="mt-3 flex justify-center">
-            <canvas
-              ref={canvasRef}
-              width={CANVAS_WIDTH}
-              height={CANVAS_HEIGHT}
-              className="w-full max-w-[760px] rounded-md border-2 border-white/40 bg-[#ececec] shadow-[0_18px_30px_rgba(0,0,0,0.2)] touch-none"
-              style={canDraw ? { cursor: drawerCursor } : undefined}
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={finishStroke}
-              onPointerLeave={finishStroke}
-              onPointerCancel={finishStroke}
-            />
+            <div className="relative w-full max-w-[760px]">
+              <canvas
+                ref={canvasRef}
+                width={CANVAS_WIDTH}
+                height={CANVAS_HEIGHT}
+                className={`w-full max-w-[760px] rounded-md border-2 border-white/40 bg-[#ececec] shadow-[0_18px_30px_rgba(0,0,0,0.2)] touch-none ${
+                  isWaitingForDrawerWord ? "opacity-60 saturate-0" : ""
+                }`}
+                style={canDraw ? { cursor: drawerCursor } : undefined}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={finishStroke}
+                onPointerLeave={finishStroke}
+                onPointerCancel={finishStroke}
+              />
+              {isWaitingForDrawerWord && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-zinc-900/20 px-6 text-center">
+                  <p className="font-['Bebas_Neue'] text-5xl tracking-wide text-white">
+                    Drawer is picking their word...
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
 
           {canDraw ? (
@@ -502,14 +542,21 @@ export default function Room({ routeRoomId }: RoomProps) {
             </div>
           ) : (
             <p className="mt-4 text-center text-sm font-semibold text-white/90">
-              Guess the word in chat. Drawer cannot type.
+              {isWaitingForDrawerWord ? "Waiting for the drawer to pick a word..." : "Guess the word in chat. Drawer cannot type."}
             </p>
           )}
         </section>
 
-        <section className="rounded-lg bg-zinc-100/95 p-4 shadow-[0_12px_25px_rgba(0,0,0,0.15)]">
+        <section className={`rounded-lg bg-zinc-100/95 p-4 shadow-[0_12px_25px_rgba(0,0,0,0.15)] ${
+          isWaitingForDrawerWord ? "opacity-75" : ""
+        }`}>
           <h2 className="text-center font-['Bebas_Neue'] text-5xl tracking-wider text-[#1982b5]">Chat</h2>
-          <div ref={chatListRef} className="mt-3 h-[520px] overflow-y-auto rounded border border-zinc-300 bg-zinc-50 p-2">
+          <div
+            ref={chatListRef}
+            className={`mt-3 h-[520px] overflow-y-auto rounded border border-zinc-300 bg-zinc-50 p-2 ${
+              isWaitingForDrawerWord ? "grayscale-[0.2]" : ""
+            }`}
+          >
             {messages.map((message) => (
               <article key={message.id} className="mb-2 rounded bg-zinc-100 px-3 py-2 shadow-sm">
                 <p className="text-sm font-bold text-zinc-800">{message.username}</p>
@@ -523,15 +570,21 @@ export default function Room({ routeRoomId }: RoomProps) {
           <form className="mt-3 flex items-center gap-2" onSubmit={handleGuessSubmit}>
             <input
               className="flex-1 border border-zinc-400 bg-white px-3 py-2 text-sm font-semibold text-zinc-900 outline-none placeholder:text-zinc-400 disabled:bg-zinc-200"
-              placeholder={canDraw ? "Drawer cannot chat" : "Type your guess..."}
+              placeholder={
+                canDraw
+                  ? "Drawer cannot chat"
+                  : isWaitingForDrawerWord
+                    ? "Drawer is picking a word..."
+                    : "Type your guess..."
+              }
               value={guessText}
               onChange={(event) => setGuessText(event.target.value)}
-              disabled={canDraw}
+              disabled={!canSubmitGuess}
             />
             <button
               type="submit"
               className="rounded bg-zinc-300 px-3 py-2 text-xl font-black text-zinc-700 transition enabled:hover:bg-zinc-400 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={canDraw}
+              disabled={!canSubmitGuess}
             >
               ➤
             </button>
@@ -540,6 +593,30 @@ export default function Room({ routeRoomId }: RoomProps) {
           {error && <p className="mt-3 text-sm font-semibold text-red-700">{error}</p>}
         </section>
       </main>
+
+      {isDrawerChoosingWord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25 px-4">
+          <div className="w-full max-w-md rounded-lg bg-zinc-100 p-6 text-center shadow-[0_24px_45px_rgba(0,0,0,0.35)]">
+            <p className="text-xl font-semibold text-zinc-900">You are the drawer. Pick one word to draw:</p>
+            <div className="mt-5 space-y-3">
+              {wordChoices.map((choice) => (
+                <button
+                  key={choice}
+                  type="button"
+                  className="w-full rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-3 text-center font-['Bebas_Neue'] text-4xl leading-none tracking-wide text-white transition duration-150 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-70"
+                  onClick={() => handleChooseWord(choice)}
+                  disabled={isChoosingWordSubmitting}
+                >
+                  {choice.toUpperCase()}
+                </button>
+              ))}
+              {wordChoices.length === 0 && (
+                <p className="text-base font-semibold text-zinc-700">Preparing word choices...</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

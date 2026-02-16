@@ -42,7 +42,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">("idle");
   const displayRoomId = roomId || routeRoomId || "";
   const isHost = host.toLowerCase() === username.toLowerCase();
-  const canStart = isHost && players.length >= 2 && phase !== "playing" && status !== "loading";
+  const canStart = isHost && players.length >= 2 && phase === "lobby" && status !== "loading";
 
   useRoomSocket({ roomId: displayRoomId, username });
 
