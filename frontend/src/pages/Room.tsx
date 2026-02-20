@@ -150,6 +150,7 @@ export default function Room({ routeRoomId }: RoomProps) {
   const activeStrokeColor = activeTool === "eraser" ? CANVAS_BACKGROUND : brushColor;
   const drawerCursor = useMemo(() => createCursorDot(brushColor, brushSize), [brushColor, brushSize]);
   const isDrawer = Boolean(drawer) && drawer.toLowerCase() === username.toLowerCase();
+  const drawerDisplayName = drawer || "Drawer";
   const isChoosingWordPhase = phase === "choosing_word";
   const isDrawerChoosingWord = isChoosingWordPhase && isDrawer;
   const isWaitingForDrawerWord = isChoosingWordPhase && !isDrawer;
@@ -157,7 +158,7 @@ export default function Room({ routeRoomId }: RoomProps) {
   const roomHeadingText = isDrawerChoosingWord
     ? "Pick A Word"
     : isWaitingForDrawerWord
-      ? "Drawer Is Choosing A Word..."
+      ? "Drawer is picking their word"
       : (canDraw ? `Your Word: ${formattedWord}` : `Word: ${formattedWord}`);
 
   useRoomSocket({ roomId: displayRoomId, username });
@@ -426,7 +427,7 @@ export default function Room({ routeRoomId }: RoomProps) {
               {isWaitingForDrawerWord && (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-zinc-900/20 px-6 text-center">
                   <p className="font-['Bebas_Neue'] text-5xl tracking-wide text-white">
-                    Drawer is picking their word...
+                    {drawerDisplayName} is thinking real hard ...
                   </p>
                 </div>
               )}
@@ -462,7 +463,9 @@ export default function Room({ routeRoomId }: RoomProps) {
                       title="Brush"
                       aria-label="Brush"
                       className={`flex h-10 w-10 items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
-                        activeTool === "brush" ? "bg-sky-500 text-white" : "bg-white/15 text-white"
+                        activeTool === "brush"
+                          ? "bg-white/15 text-white ring-2 ring-sky-400"
+                          : "bg-white/15 text-white"
                       }`}
                       onClick={() => setActiveTool("brush")}
                     >
@@ -473,7 +476,9 @@ export default function Room({ routeRoomId }: RoomProps) {
                       title="Eraser"
                       aria-label="Eraser"
                       className={`flex h-10 w-10 items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
-                        activeTool === "eraser" ? "bg-sky-500 text-white" : "bg-white/15 text-white"
+                        activeTool === "eraser"
+                          ? "bg-white/15 text-white ring-2 ring-sky-400"
+                          : "bg-white/15 text-white"
                       }`}
                       onClick={() => setActiveTool("eraser")}
                     >
@@ -484,7 +489,9 @@ export default function Room({ routeRoomId }: RoomProps) {
                       title="Bucket"
                       aria-label="Bucket"
                       className={`flex h-10 w-10 items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
-                        activeTool === "bucket" ? "bg-sky-500 text-white" : "bg-white/15 text-white"
+                        activeTool === "bucket"
+                          ? "bg-white/15 text-white ring-2 ring-sky-400"
+                          : "bg-white/15 text-white"
                       }`}
                       onClick={() => setActiveTool("bucket")}
                     >
@@ -541,9 +548,11 @@ export default function Room({ routeRoomId }: RoomProps) {
               </div>
             </div>
           ) : (
-            <p className="mt-4 text-center text-sm font-semibold text-white/90">
-              {isWaitingForDrawerWord ? "Waiting for the drawer to pick a word..." : "Guess the word in chat. Drawer cannot type."}
-            </p>
+            !isWaitingForDrawerWord && (
+              <p className="mt-4 text-center text-sm font-semibold text-white/90">
+                Guess the word in chat.
+              </p>
+            )
           )}
         </section>
 
