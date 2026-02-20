@@ -23,6 +23,7 @@ export type RoomSnapshot = {
   guessedPlayers: string[];
   messages: ChatMessage[];
   strokes: Stroke[];
+  chooseEndsAt: number;
   roundEndsAt: number;
   roundNumber: number;
   totalRounds: number;
@@ -78,6 +79,7 @@ type ConnectionState = {
   guessedPlayers: string[];
   messages: ChatMessage[];
   strokes: Stroke[];
+  chooseEndsAt: number;
   roundEndsAt: number;
   roundNumber: number;
   totalRounds: number;
@@ -99,6 +101,7 @@ const initialState: ConnectionState = {
   guessedPlayers: [],
   messages: [],
   strokes: [],
+  chooseEndsAt: 0,
   roundEndsAt: 0,
   roundNumber: 1,
   totalRounds: 0,
@@ -128,6 +131,7 @@ function applySnapshot(state: ConnectionState, snapshot: RoomSnapshot) {
   state.guessedPlayers = snapshot.guessedPlayers;
   state.messages = snapshot.messages;
   state.strokes = snapshot.strokes;
+  state.chooseEndsAt = snapshot.chooseEndsAt;
   state.roundEndsAt = snapshot.roundEndsAt;
   state.roundNumber = snapshot.roundNumber;
   state.totalRounds = snapshot.totalRounds;

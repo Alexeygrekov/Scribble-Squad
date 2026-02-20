@@ -8,10 +8,12 @@ const router = Router();
 
 const rooms = new Map();
 const roundTimeouts = new Map();
+const chooseWordTimeouts = new Map();
 
 const ROOM_ID_LENGTH = 6;
 const ROOM_ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CHOOSE_WORD_OPTIONS = 3;
+const CHOOSE_WORD_DURATION_MS = 30_000;
 const ROUND_DURATION_MS = 90_000;
 const MAX_CHAT_MESSAGES = 220;
 const WORDS = [
@@ -142,6 +144,25 @@ function clearRoundTimeout(roomId) {
   roundTimeouts.delete(roomId);
 }
 
+function clearChooseWordTimeout(roomId) {
+  const timeoutHandle = chooseWordTimeouts.get(roomId);
+  if (!timeoutHandle) {
+    return;
+  }
+  clearTimeout(timeoutHandle);
+  chooseWordTimeouts.delete(roomId);
+}
+
+function pickRandomFromQueue(queue) {
+  if (!Array.isArray(queue) || queue.length === 0) {
+    return null;
+  }
+
+  const pickedIndex = randomInt(0, queue.length);
+  const [pickedPlayer] = queue.splice(pickedIndex, 1);
+  return pickedPlayer || null;
+}
+
 function buildMessage(type, username, text, options = {}) {
   const privateTo = typeof options.privateTo === "string" ? options.privateTo.trim() : "";
 
@@ -162,33 +183,20 @@ function appendMessage(room, message) {
   }
 }
 
-function takeNextDrawer(room, previousDrawer = "") {
+function takeNextDrawer(room) {
   room.firstPassQueue = sanitizeQueue(room.firstPassQueue, room.players);
   room.secondPassQueue = sanitizeQueue(room.secondPassQueue, room.players);
 
-  if (room.firstPassQueue.length === 0 && room.secondPassQueue.length === 0 && room.roundsCompleted < room.totalRounds) {
-    room.secondPassQueue = shufflePlayers(room.players);
-
-    if (previousDrawer && room.secondPassQueue.length > 1) {
-      const previousLower = previousDrawer.toLowerCase();
-      if (room.secondPassQueue[0].toLowerCase() === previousLower) {
-        const swapIndex = room.secondPassQueue.findIndex((playerName, index) => (
-          index > 0 && playerName.toLowerCase() !== previousLower
-        ));
-
-        if (swapIndex > 0) {
-          [room.secondPassQueue[0], room.secondPassQueue[swapIndex]] = [room.secondPassQueue[swapIndex], room.secondPassQueue[0]];
-        }
-      }
-    }
+  if (room.firstPassQueue.length > 0) {
+    return pickRandomFromQueue(room.firstPassQueue);
   }
 
-  if (room.firstPassQueue.length > 0) {
-    return room.firstPassQueue.shift() || null;
+  if (room.secondPassQueue.length === 0 && room.roundsCompleted < room.totalRounds) {
+    room.secondPassQueue = [...room.players];
   }
 
   if (room.secondPassQueue.length > 0) {
-    return room.secondPassQueue.shift() || null;
+    return pickRandomFromQueue(room.secondPassQueue);
   }
 
   return null;
@@ -196,6 +204,7 @@ function takeNextDrawer(room, previousDrawer = "") {
 
 function enterChoosingWordPhase(room, drawerName) {
   clearRoundTimeout(room.id);
+  clearChooseWordTimeout(room.id);
 
   room.phase = "choosing_word";
   room.drawer = drawerName;
@@ -203,13 +212,36 @@ function enterChoosingWordPhase(room, drawerName) {
   room.wordChoices = pickWordChoices(CHOOSE_WORD_OPTIONS);
   room.strokes = [];
   room.guessedPlayers = new Set();
+  room.chooseEndsAt = Date.now() + CHOOSE_WORD_DURATION_MS;
   room.roundEndsAt = 0;
 
   appendMessage(room, buildMessage("system", "System", `${drawerName} is picking a word...`));
+  scheduleChooseWordTimeout(room);
+}
+
+function startPlayingRound(room, chosenWord, options = {}) {
+  clearChooseWordTimeout(room.id);
+
+  const autoSelected = Boolean(options.autoSelected);
+
+  room.phase = "playing";
+  room.word = chosenWord;
+  room.wordChoices = [];
+  room.strokes = [];
+  room.guessedPlayers = new Set();
+  room.chooseEndsAt = 0;
+  room.roundEndsAt = Date.now() + ROUND_DURATION_MS;
+
+  if (autoSelected && room.drawer) {
+    appendMessage(room, buildMessage("system", "System", `${room.drawer} ran out of pick time. A random word was selected.`));
+  }
+  appendMessage(room, buildMessage("system", "System", "Round started. Start guessing!"));
+  scheduleRoundTimeout(room);
 }
 
 function finishGame(room, reason) {
   clearRoundTimeout(room.id);
+  clearChooseWordTimeout(room.id);
 
   room.phase = "game_over";
   room.drawer = null;
@@ -217,6 +249,7 @@ function finishGame(room, reason) {
   room.wordChoices = [];
   room.strokes = [];
   room.guessedPlayers = new Set();
+  room.chooseEndsAt = 0;
   room.roundEndsAt = 0;
 
   if (reason) {
@@ -236,10 +269,11 @@ function completeActiveRound(room, reasonMessage) {
     return;
   }
 
-  const previousDrawer = room.drawer || "";
   clearRoundTimeout(room.id);
+  clearChooseWordTimeout(room.id);
 
   room.roundEndsAt = 0;
+  room.chooseEndsAt = 0;
   room.word = "";
   room.wordChoices = [];
   room.strokes = [];
@@ -256,7 +290,7 @@ function completeActiveRound(room, reasonMessage) {
     return;
   }
 
-  const nextDrawer = takeNextDrawer(room, previousDrawer);
+  const nextDrawer = takeNextDrawer(room);
   if (!nextDrawer) {
     finishGame(room, "Game over! Everyone has drawn twice.");
     return;
@@ -288,6 +322,42 @@ function scheduleRoundTimeout(room) {
   }, waitMs + 15);
 
   roundTimeouts.set(room.id, timeoutHandle);
+}
+
+function scheduleChooseWordTimeout(room) {
+  clearChooseWordTimeout(room.id);
+
+  if (room.phase !== "choosing_word" || !Number.isFinite(room.chooseEndsAt) || room.chooseEndsAt <= 0) {
+    return;
+  }
+
+  const waitMs = Math.max(0, room.chooseEndsAt - Date.now());
+
+  const timeoutHandle = setTimeout(() => {
+    const latestRoom = rooms.get(room.id);
+    if (!latestRoom || latestRoom.phase !== "choosing_word") {
+      return;
+    }
+
+    if (!Array.isArray(latestRoom.wordChoices) || latestRoom.wordChoices.length === 0) {
+      latestRoom.wordChoices = pickWordChoices(CHOOSE_WORD_OPTIONS);
+    }
+
+    const pickedWord = latestRoom.wordChoices.length > 0
+      ? latestRoom.wordChoices[randomInt(0, latestRoom.wordChoices.length)]
+      : "";
+
+    if (!pickedWord) {
+      finishGame(latestRoom, "Game over. Unable to start a new round.");
+    } else {
+      startPlayingRound(latestRoom, pickedWord, { autoSelected: true });
+    }
+
+    writePersistedRooms();
+    notifyRoomUpdated(latestRoom.id);
+  }, waitMs + 15);
+
+  chooseWordTimeouts.set(room.id, timeoutHandle);
 }
 
 function normalizePersistedRoom(rawRoom) {
@@ -408,6 +478,9 @@ function normalizePersistedRoom(rawRoom) {
     Math.max(1, totalRounds)
   );
 
+  const chooseEndsAtRaw = Number(rawRoom?.chooseEndsAt);
+  const chooseEndsAt = Number.isFinite(chooseEndsAtRaw) && chooseEndsAtRaw > 0 ? chooseEndsAtRaw : 0;
+
   const roundEndsAtRaw = Number(rawRoom?.roundEndsAt);
   const roundEndsAt = Number.isFinite(roundEndsAtRaw) && roundEndsAtRaw > 0 ? roundEndsAtRaw : 0;
 
@@ -427,6 +500,7 @@ function normalizePersistedRoom(rawRoom) {
     guessedPlayers,
     messages,
     strokes,
+    chooseEndsAt,
     roundEndsAt,
     roundNumber,
     totalRounds,
@@ -540,6 +614,7 @@ function serializeRoom(room, viewerUsername = "") {
       ...stroke,
       points: stroke.points.map((point) => ({ ...point }))
     })),
+    chooseEndsAt: room.phase === "choosing_word" ? room.chooseEndsAt : 0,
     roundEndsAt: room.phase === "playing" ? room.roundEndsAt : 0,
     roundNumber: room.roundNumber,
     totalRounds: room.totalRounds,
@@ -565,17 +640,39 @@ function recoverRunningRoundsAfterBoot() {
   let changed = false;
 
   rooms.forEach((room) => {
-    if (room.phase !== "playing") {
+    if (room.phase === "playing") {
+      if (room.roundEndsAt > Date.now()) {
+        scheduleRoundTimeout(room);
+        return;
+      }
+
+      const revealedWord = room.word;
+      completeActiveRound(room, `Time is up! The word was ${revealedWord.toUpperCase()}.`);
+      changed = true;
       return;
     }
 
-    if (room.roundEndsAt > Date.now()) {
-      scheduleRoundTimeout(room);
+    if (room.phase !== "choosing_word") {
       return;
     }
 
-    const revealedWord = room.word;
-    completeActiveRound(room, `Time is up! The word was ${revealedWord.toUpperCase()}.`);
+    if (room.chooseEndsAt > Date.now()) {
+      scheduleChooseWordTimeout(room);
+      return;
+    }
+
+    if (!Array.isArray(room.wordChoices) || room.wordChoices.length === 0) {
+      room.wordChoices = pickWordChoices(CHOOSE_WORD_OPTIONS);
+    }
+
+    const pickedWord = room.wordChoices.length > 0
+      ? room.wordChoices[randomInt(0, room.wordChoices.length)]
+      : "";
+    if (!pickedWord) {
+      finishGame(room, "Game over. Unable to start a new round.");
+    } else {
+      startPlayingRound(room, pickedWord, { autoSelected: true });
+    }
     changed = true;
   });
 
@@ -647,6 +744,7 @@ router.post("/create", (req, res) => {
     guessedPlayers: new Set(),
     messages: [],
     strokes: [],
+    chooseEndsAt: 0,
     roundEndsAt: 0,
     roundNumber: 1,
     totalRounds: 0,
@@ -735,8 +833,8 @@ router.post("/:roomId/start", (req, res) => {
     room.scores[playerName] = 0;
   });
 
-  const firstPassOrder = shufflePlayers(room.players);
-  const pickedDrawer = firstPassOrder.shift() || null;
+  const firstPassOrder = [...room.players];
+  const pickedDrawer = pickRandomFromQueue(firstPassOrder);
   if (!pickedDrawer) {
     res.status(500).json({ error: "Unable to select a drawer." });
     return;
@@ -752,6 +850,8 @@ router.post("/:roomId/start", (req, res) => {
   room.wordChoices = [];
   room.strokes = [];
   room.guessedPlayers = new Set();
+  room.chooseEndsAt = 0;
+  room.roundEndsAt = 0;
 
   enterChoosingWordPhase(room, pickedDrawer);
 
@@ -796,15 +896,7 @@ router.post("/:roomId/choose-word", (req, res) => {
     return;
   }
 
-  room.phase = "playing";
-  room.word = chosenWord;
-  room.wordChoices = [];
-  room.strokes = [];
-  room.guessedPlayers = new Set();
-  room.roundEndsAt = Date.now() + ROUND_DURATION_MS;
-
-  appendMessage(room, buildMessage("system", "System", "Round started. Start guessing!"));
-  scheduleRoundTimeout(room);
+  startPlayingRound(room, chosenWord);
 
   writePersistedRooms();
   notifyRoomUpdated(roomId);
@@ -868,7 +960,7 @@ router.post("/:roomId/guess", (req, res) => {
       buildMessage(
         "success",
         "System",
-        `You were correct! The word was ${room.word}. (${toOrdinal(guessOrder)} / ${totalGuessers} player${totalGuessers === 1 ? "" : "s"})`,
+        `You were correct! The word was ${room.word}. (${toOrdinal(guessOrder)} / ${totalGuessers})`,
         { privateTo: resolvedPlayer }
       )
     );
