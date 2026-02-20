@@ -9,9 +9,14 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Bebas+Neue&display=block"
     />
+    <style>
+      body.app-loading #root {
+        opacity: 0;
+      }
+    </style>
     <title>Scribble Squad</title>
   </head>
-  <body class="min-h-screen bg-gray-50">
+  <body class="app-loading min-h-screen bg-gray-50">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

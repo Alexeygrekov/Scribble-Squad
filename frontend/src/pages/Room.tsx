@@ -9,8 +9,8 @@ const CANVAS_WIDTH = 760;
 const CANVAS_HEIGHT = 520;
 const CANVAS_BACKGROUND = "#ececec";
 const DRAW_COLORS = [
-  "#ffffff", "#c8ced8", "#4f5d75", "#f8e71c", "#ffb703", "#f94144", "#d59649", "#f6bdcf", "#f023e1", "#1717e0", "#17e5e5",
-  "#00e700", "#cfd2d8", "#000000", "#f2cc0c", "#ee7a16", "#b50000", "#af5b16", "#dc6ea7", "#9707a2", "#22228f", "#2999f0"
+  "#FFFFFF", "#9CA3AF", "#FFF000", "#FFB000", "#FF1500", "#D59549", "#F0B6CF", "#E90CF0", "#1717E0", "#17E5E5", "#00FF00",
+  "#D9D9D9", "#000000", "#F2CC0C", "#EE7A16", "#B50000", "#AF5B16", "#DC6EA7", "#9707A2", "#22228F", "#2999F0", "#008F00"
 ];
 const THICKNESS_OPTIONS = [3, 6, 10, 14, 18];
 
@@ -444,7 +444,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                         key={color}
                         type="button"
                         title={color}
-                        className={`h-[18px] w-[18px] rounded-[4px] border transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                        className={`h-[18px] w-[18px] cursor-pointer rounded-[4px] border transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                           brushColor === color
                             ? "border-white/25 ring-2 ring-sky-400"
                             : "border-white/25"
@@ -462,7 +462,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       type="button"
                       title="Brush"
                       aria-label="Brush"
-                      className={`flex h-10 w-10 items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                      className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                         activeTool === "brush"
                           ? "bg-white/15 text-white ring-2 ring-sky-400"
                           : "bg-white/15 text-white"
@@ -475,7 +475,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       type="button"
                       title="Eraser"
                       aria-label="Eraser"
-                      className={`flex h-10 w-10 items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                      className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                         activeTool === "eraser"
                           ? "bg-white/15 text-white ring-2 ring-sky-400"
                           : "bg-white/15 text-white"
@@ -488,7 +488,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       type="button"
                       title="Bucket"
                       aria-label="Bucket"
-                      className={`flex h-10 w-10 items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                      className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                         activeTool === "bucket"
                           ? "bg-white/15 text-white ring-2 ring-sky-400"
                           : "bg-white/15 text-white"
@@ -501,7 +501,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       type="button"
                       title="Undo"
                       aria-label="Undo"
-                      className={`flex h-10 w-10 items-center justify-center rounded-md text-white transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                      className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md text-white transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                         activeAction === "undo" ? "bg-sky-500" : "bg-white/15"
                       }`}
                       onClick={handleUndo}
@@ -512,7 +512,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       type="button"
                       title="Delete"
                       aria-label="Delete"
-                      className={`flex h-10 w-10 items-center justify-center rounded-md text-white transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                      className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md text-white transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                         activeAction === "delete" ? "bg-sky-500" : "bg-white/15"
                       }`}
                       onClick={handleClearCanvas}
@@ -529,7 +529,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                         key={sizeOption}
                         type="button"
                         title={`${sizeOption}px`}
-                        className={`flex h-10 w-10 items-center justify-center rounded-md bg-white/15 transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                        className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md bg-white/15 transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                           brushSize === sizeOption ? "ring-2 ring-sky-400" : ""
                         }`}
                         onClick={() => setBrushSize(sizeOption)}
@@ -548,7 +548,7 @@ export default function Room({ routeRoomId }: RoomProps) {
               </div>
             </div>
           ) : (
-            !isWaitingForDrawerWord && (
+            !isWaitingForDrawerWord && !isDrawerChoosingWord && (
               <p className="mt-4 text-center text-sm font-semibold text-white/90">
                 Guess the word in chat.
               </p>
