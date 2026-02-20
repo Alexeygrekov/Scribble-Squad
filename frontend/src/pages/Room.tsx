@@ -13,6 +13,9 @@ const DRAW_COLORS = [
   "#D9D9D9", "#000000", "#F2CC0C", "#EE7A16", "#B50000", "#AF5B16", "#DC6EA7", "#9707A2", "#22228F", "#2999F0", "#008F00"
 ];
 const THICKNESS_OPTIONS = [3, 6, 10, 14, 18];
+const CHAT_TEXT_COLORS = [
+  "#2563eb", "#8b5cf6", "#ef4444", "#16a34a", "#0d9488", "#ea580c", "#db2777", "#4f46e5", "#1d4ed8", "#be123c"
+];
 
 type RoomProps = {
   routeRoomId?: string;
@@ -110,6 +113,26 @@ function drawStroke(ctx: CanvasRenderingContext2D, stroke: DrawStroke) {
   ctx.stroke();
 }
 
+function hashName(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function getChatColorForName(name: string) {
+  const index = hashName(name.toLowerCase()) % CHAT_TEXT_COLORS.length;
+  return CHAT_TEXT_COLORS[index];
+}
+
+function formatTimerLabel(totalSeconds: number) {
+  const seconds = Math.max(0, totalSeconds);
+  const minutesPart = Math.floor(seconds / 60);
+  const secondsPart = seconds % 60;
+  return `${minutesPart}:${String(secondsPart).padStart(2, "0")}`;
+}
+
 export default function Room({ routeRoomId }: RoomProps) {
   const dispatch = useAppDispatch();
   const {
@@ -122,8 +145,13 @@ export default function Room({ routeRoomId }: RoomProps) {
     wordDisplay,
     wordChoices,
     canDraw,
+    guessedPlayers,
     messages,
     strokes,
+    roundEndsAt,
+    roundNumber,
+    totalRounds,
+    roundsCompleted,
     error
   } = useAppSelector((state) => state.connection);
 
@@ -136,6 +164,7 @@ export default function Room({ routeRoomId }: RoomProps) {
   const [guessText, setGuessText] = useState("");
   const [isDrawing, setIsDrawing] = useState(false);
   const [liveStrokePoints, setLiveStrokePoints] = useState<StrokePoint[]>([]);
+  const [nowTs, setNowTs] = useState(() => Date.now());
 
   const drawingPointsRef = useRef<StrokePoint[]>([]);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -154,7 +183,22 @@ export default function Room({ routeRoomId }: RoomProps) {
   const isChoosingWordPhase = phase === "choosing_word";
   const isDrawerChoosingWord = isChoosingWordPhase && isDrawer;
   const isWaitingForDrawerWord = isChoosingWordPhase && !isDrawer;
-  const canSubmitGuess = phase === "playing" && !canDraw;
+  const isGameOver = phase === "game_over";
+  const guessedPlayerSet = useMemo(
+    () => new Set(guessedPlayers.map((playerName) => playerName.toLowerCase())),
+    [guessedPlayers]
+  );
+  const hasGuessedCurrentRound = guessedPlayerSet.has(username.toLowerCase());
+  const canSubmitGuess = phase === "playing" && !canDraw && !hasGuessedCurrentRound;
+  const timerSecondsLeft = phase === "playing" && roundEndsAt > 0
+    ? Math.max(0, Math.ceil((roundEndsAt - nowTs) / 1000))
+    : 0;
+  const timerLabel = formatTimerLabel(timerSecondsLeft);
+  const displayedTotalRounds = Math.max(totalRounds, roundsCompleted, 1);
+  const rankedPlayers = useMemo(
+    () => [...players].sort((left, right) => right.score - left.score || left.name.localeCompare(right.name)),
+    [players]
+  );
   const roomHeadingText = isDrawerChoosingWord
     ? "Pick A Word"
     : isWaitingForDrawerWord
@@ -190,6 +234,21 @@ export default function Room({ routeRoomId }: RoomProps) {
       setIsChoosingWordSubmitting(false);
     }
   }, [isChoosingWordPhase]);
+
+  useEffect(() => {
+    setNowTs(Date.now());
+    if (phase !== "playing") {
+      return;
+    }
+
+    const timerId = window.setInterval(() => {
+      setNowTs(Date.now());
+    }, 1000);
+
+    return () => {
+      window.clearInterval(timerId);
+    };
+  }, [phase, roundEndsAt]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -360,6 +419,93 @@ export default function Room({ routeRoomId }: RoomProps) {
     dispatch(leaveLobby());
   }
 
+  if (isGameOver) {
+    const firstPlace = rankedPlayers[0] || null;
+    const secondPlace = rankedPlayers[1] || null;
+    const thirdPlace = rankedPlayers[2] || null;
+    const remainingPlayers = rankedPlayers.slice(3);
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 py-6 sm:px-8 sm:py-8">
+        <button
+          type="button"
+          className="rounded-md bg-white/20 px-4 py-2 text-sm font-bold tracking-wide text-white transition hover:bg-white/30"
+          onClick={handleGoHome}
+        >
+          Home
+        </button>
+
+        <main className="mx-auto mt-8 w-full max-w-5xl">
+          <h1 className="text-center font-['Bebas_Neue'] text-7xl tracking-wider text-white">Game Over</h1>
+          <p className="mt-2 text-center text-2xl font-semibold text-white/95">Final Standings</p>
+
+          <section className="mx-auto mt-8 grid max-w-4xl items-end gap-4 sm:grid-cols-3">
+            <div className="order-1 sm:order-1">
+              {secondPlace ? (
+                <div className="rounded-lg bg-zinc-100/95 p-4 text-center shadow-[0_12px_24px_rgba(0,0,0,0.2)]">
+                  <p className="font-['Bebas_Neue'] text-5xl leading-none text-zinc-900">2nd</p>
+                  <p className="mt-2 text-3xl font-black text-zinc-900">{secondPlace.name}</p>
+                  <p className="text-xl font-semibold text-zinc-700">{secondPlace.score} pts</p>
+                </div>
+              ) : (
+                <div />
+              )}
+            </div>
+
+            <div className="order-2 sm:order-2">
+              {firstPlace ? (
+                <div className="rounded-lg border-2 border-amber-300 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                  <p className="font-['Bebas_Neue'] text-6xl leading-none text-amber-500">1st</p>
+                  <p className="mt-2 text-4xl font-black text-zinc-900">{firstPlace.name}</p>
+                  <p className="text-2xl font-semibold text-zinc-700">{firstPlace.score} pts</p>
+                </div>
+              ) : (
+                <div />
+              )}
+            </div>
+
+            <div className="order-3 sm:order-3">
+              {thirdPlace ? (
+                <div className="rounded-lg bg-zinc-100/95 p-4 text-center shadow-[0_10px_20px_rgba(0,0,0,0.2)]">
+                  <p className="font-['Bebas_Neue'] text-5xl leading-none text-zinc-900">3rd</p>
+                  <p className="mt-2 text-3xl font-black text-zinc-900">{thirdPlace.name}</p>
+                  <p className="text-xl font-semibold text-zinc-700">{thirdPlace.score} pts</p>
+                </div>
+              ) : (
+                <div />
+              )}
+            </div>
+          </section>
+
+          <section className="mx-auto mt-6 w-full max-w-3xl rounded-lg bg-zinc-100/95 p-4 shadow-[0_12px_25px_rgba(0,0,0,0.15)]">
+            <h2 className="text-center font-['Bebas_Neue'] text-4xl tracking-wide text-[#1982b5]">All Players</h2>
+            <ul className="mt-3 space-y-2">
+              {rankedPlayers.map((player, index) => (
+                <li key={player.name} className="flex items-center justify-between rounded border border-zinc-300 bg-zinc-50 px-3 py-2">
+                  <p className="text-xl font-bold text-zinc-900">{index + 1}. {player.name}</p>
+                  <p className="text-lg font-semibold text-zinc-700">{player.score} pts</p>
+                </li>
+              ))}
+              {remainingPlayers.length === 0 && rankedPlayers.length <= 3 && (
+                <li className="rounded border border-zinc-300 bg-zinc-50 px-3 py-2 text-center text-lg font-semibold text-zinc-700">
+                  Everyone made the podium.
+                </li>
+              )}
+            </ul>
+          </section>
+
+          <button
+            type="button"
+            className="mx-auto mt-6 block w-full max-w-3xl bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition hover:bg-[#ff4c3a]"
+            onClick={handleGoHome}
+          >
+            Home
+          </button>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 py-4 sm:px-7 sm:py-6">
       <button
@@ -378,24 +524,32 @@ export default function Room({ routeRoomId }: RoomProps) {
               const isPlayerHost = player.name.toLowerCase() === host.toLowerCase();
               const isPlayerDrawer = drawer ? player.name.toLowerCase() === drawer.toLowerCase() : false;
               const isYou = player.name.toLowerCase() === username.toLowerCase();
+              const isPlayerGuessed = guessedPlayerSet.has(player.name.toLowerCase());
 
               return (
                 <li key={player.name} className="rounded border border-zinc-300 bg-zinc-50 px-3 py-3 shadow-sm">
-                  <p className="text-xl font-bold text-zinc-800">
-                    {player.name}
-                    {isYou ? " (you)" : ""}
-                  </p>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <span className="text-base font-semibold text-zinc-700">{player.score} pts</span>
-                    {isPlayerHost && (
-                      <span className="rounded bg-orange-500 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
-                        Host
-                      </span>
-                    )}
-                    {isPlayerDrawer && (
-                      <span className="rounded bg-sky-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
-                        Drawing
-                      </span>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xl font-bold text-zinc-800">
+                        {player.name}
+                        {isYou ? " (you)" : ""}
+                      </p>
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <span className="text-base font-semibold text-zinc-700">{player.score} pts</span>
+                        {isPlayerHost && (
+                          <span className="rounded bg-orange-500 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+                            Host
+                          </span>
+                        )}
+                        {isPlayerDrawer && (
+                          <span className="rounded bg-sky-600 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+                            Drawing
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {phase === "playing" && isPlayerGuessed && !isPlayerDrawer && (
+                      <span className="mt-1 text-2xl font-black text-green-600">✓</span>
                     )}
                   </div>
                 </li>
@@ -408,6 +562,16 @@ export default function Room({ routeRoomId }: RoomProps) {
           <h2 className="text-center font-['Bebas_Neue'] text-6xl tracking-wider text-white">
             {roomHeadingText}
           </h2>
+          {totalRounds > 0 && (
+            <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-white">
+              <p className="font-['Bebas_Neue'] text-3xl tracking-wide">
+                Round {Math.max(1, roundNumber)} / {displayedTotalRounds}
+              </p>
+              {phase === "playing" && (
+                <p className="font-['Bebas_Neue'] text-3xl tracking-wide">Time {timerLabel}</p>
+              )}
+            </div>
+          )}
           <div className="mt-3 flex justify-center">
             <div className="relative w-full max-w-[760px]">
               <canvas
@@ -562,18 +726,38 @@ export default function Room({ routeRoomId }: RoomProps) {
           <h2 className="text-center font-['Bebas_Neue'] text-5xl tracking-wider text-[#1982b5]">Chat</h2>
           <div
             ref={chatListRef}
-            className={`mt-3 h-[520px] overflow-y-auto rounded border border-zinc-300 bg-zinc-50 p-2 ${
+            className={`mt-3 h-[520px] overflow-y-scroll rounded border border-zinc-300 bg-zinc-50 p-2 ${
               isWaitingForDrawerWord ? "grayscale-[0.2]" : ""
             }`}
           >
-            {messages.map((message) => (
-              <article key={message.id} className="mb-2 rounded bg-zinc-100 px-3 py-2 shadow-sm">
-                <p className="text-sm font-bold text-zinc-800">{message.username}</p>
-                <p className={`text-base ${message.type === "system" ? "font-semibold text-zinc-700" : "text-zinc-900"}`}>
-                  {message.text}
-                </p>
-              </article>
-            ))}
+            {messages.map((message) => {
+              const isGuessMessage = message.type === "guess";
+              const isSuccessMessage = message.type === "success";
+              const guessColor = getChatColorForName(message.username);
+
+              return (
+                <article key={message.id} className="mb-2 rounded bg-zinc-100 px-3 py-2 shadow-sm">
+                  <p
+                    className="text-sm font-bold"
+                    style={isGuessMessage ? { color: guessColor } : undefined}
+                  >
+                    {message.username}
+                  </p>
+                  <p
+                    className={`text-base ${
+                      isSuccessMessage
+                        ? "font-semibold text-green-700"
+                        : message.type === "system"
+                          ? "font-semibold text-zinc-700"
+                          : "font-semibold"
+                    }`}
+                    style={isGuessMessage ? { color: guessColor } : undefined}
+                  >
+                    {message.text}
+                  </p>
+                </article>
+              );
+            })}
           </div>
 
           <form className="mt-3 flex items-center gap-2" onSubmit={handleGuessSubmit}>
@@ -582,6 +766,8 @@ export default function Room({ routeRoomId }: RoomProps) {
               placeholder={
                 canDraw
                   ? "Drawer cannot chat"
+                  : hasGuessedCurrentRound
+                    ? "You already guessed correctly."
                   : isWaitingForDrawerWord
                     ? "Drawer is picking a word..."
                     : "Type your guess..."

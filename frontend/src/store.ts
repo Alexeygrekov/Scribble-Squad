@@ -3,8 +3,8 @@ import { configureStore, createAsyncThunk, createSlice, type PayloadAction } fro
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 type SessionStatus = "idle" | "loading" | "connected" | "error";
-type GamePhase = "lobby" | "choosing_word" | "playing";
-type MessageType = "guess" | "system";
+type GamePhase = "lobby" | "choosing_word" | "playing" | "game_over";
+type MessageType = "guess" | "system" | "success";
 
 export type StrokePoint = { x: number; y: number };
 export type Stroke = { id: string; mode: "stroke" | "fill"; color: string; size: number; points: StrokePoint[] };
@@ -23,6 +23,10 @@ export type RoomSnapshot = {
   guessedPlayers: string[];
   messages: ChatMessage[];
   strokes: Stroke[];
+  roundEndsAt: number;
+  roundNumber: number;
+  totalRounds: number;
+  roundsCompleted: number;
 };
 
 type JoinGamePayload = {
@@ -74,6 +78,10 @@ type ConnectionState = {
   guessedPlayers: string[];
   messages: ChatMessage[];
   strokes: Stroke[];
+  roundEndsAt: number;
+  roundNumber: number;
+  totalRounds: number;
+  roundsCompleted: number;
   error: string | null;
 };
 
@@ -91,6 +99,10 @@ const initialState: ConnectionState = {
   guessedPlayers: [],
   messages: [],
   strokes: [],
+  roundEndsAt: 0,
+  roundNumber: 1,
+  totalRounds: 0,
+  roundsCompleted: 0,
   error: null
 };
 
@@ -116,6 +128,10 @@ function applySnapshot(state: ConnectionState, snapshot: RoomSnapshot) {
   state.guessedPlayers = snapshot.guessedPlayers;
   state.messages = snapshot.messages;
   state.strokes = snapshot.strokes;
+  state.roundEndsAt = snapshot.roundEndsAt;
+  state.roundNumber = snapshot.roundNumber;
+  state.totalRounds = snapshot.totalRounds;
+  state.roundsCompleted = snapshot.roundsCompleted;
 }
 
 export const joinGame = createAsyncThunk<JoinOrCreateResponse, JoinGamePayload, { rejectValue: string }>(

@@ -114,7 +114,7 @@ export default function App() {
   useEffect(() => {
     if (status === "connected" && roomId && username) {
       writeStoredSession({ roomId, username });
-      const inRoomPhase = phase === "playing" || phase === "choosing_word";
+      const inRoomPhase = phase === "playing" || phase === "choosing_word" || phase === "game_over";
 
       if (inRoomPhase && route.kind !== "room") {
         navigate(`/room/${roomId}`, true);
