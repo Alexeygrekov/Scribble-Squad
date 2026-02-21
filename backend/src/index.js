@@ -10,9 +10,38 @@ import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-const ORIGIN = process.env.CORS_ORIGIN || "http://localhost:5173";
+const configuredOrigins = String(process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
-app.use(cors({ origin: ORIGIN }));
+function isAllowedOrigin(origin) {
+  if (!origin) {
+    return true;
+  }
+
+  if (configuredOrigins.length > 0) {
+    return configuredOrigins.includes(origin);
+  }
+
+  try {
+    const parsedOrigin = new URL(origin);
+    return parsedOrigin.hostname === "localhost" || parsedOrigin.hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+app.use(cors({
+  origin(origin, callback) {
+    if (isAllowedOrigin(String(origin || ""))) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`CORS blocked for origin: ${origin || "unknown"}`));
+  }
+}));
 app.use(express.json());
 app.use(morgan("dev"));
 
@@ -97,6 +126,18 @@ const unsubscribeRoomUpdates = subscribeRoomUpdates((roomId) => {
 
     sendJson(client.socket, { type: "snapshot", snapshot });
   });
+});
+
+server.on("error", (error) => {
+  if (error?.code === "EADDRINUSE") {
+    console.error(
+      `Port ${PORT} is already in use. Stop the existing process on port ${PORT} or run this server with a different PORT.`
+    );
+    process.exit(1);
+  }
+
+  console.error("Failed to start server:", error);
+  process.exit(1);
 });
 
 server.listen(PORT, () => console.log(`API on http://localhost:${PORT}`));

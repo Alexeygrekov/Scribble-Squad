@@ -6,7 +6,7 @@ import { useRoomSocket } from "../useRoomSocket";
 const SESSION_KEY = "scribble_squad_tab_session";
 const ROOM_NOT_FOUND_ERROR = "Room not found.";
 const CANVAS_WIDTH = 760;
-const CANVAS_HEIGHT = 520;
+const CANVAS_HEIGHT = 620;
 const CANVAS_BACKGROUND = "#ececec";
 const DRAW_COLORS = [
   "#FFFFFF", "#9CA3AF", "#FFF000", "#FFB000", "#FF1500", "#D59549", "#F0B6CF", "#E90CF0", "#1717E0", "#17E5E5", "#00FF00",
@@ -157,7 +157,7 @@ export default function Room({ routeRoomId }: RoomProps) {
   } = useAppSelector((state) => state.connection);
 
   const displayRoomId = roomId || routeRoomId || "";
-  const [brushColor, setBrushColor] = useState("#f94144");
+  const [brushColor, setBrushColor] = useState("#000000");
   const [brushSize, setBrushSize] = useState(6);
   const [activeTool, setActiveTool] = useState<DrawTool>("brush");
   const [activeAction, setActiveAction] = useState<"undo" | "delete" | null>(null);
@@ -220,6 +220,19 @@ export default function Room({ routeRoomId }: RoomProps) {
     }
     chatElement.scrollTop = chatElement.scrollHeight;
   }, [messages.length]);
+
+  useEffect(() => {
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, []);
 
   useEffect(() => {
     if (error !== ROOM_NOT_FOUND_ERROR) {
@@ -540,19 +553,42 @@ export default function Room({ routeRoomId }: RoomProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 py-4 sm:px-7 sm:py-6">
-      <button
-        type="button"
-        className="rounded-md bg-white/20 px-4 py-2 text-sm font-bold tracking-wide text-white transition hover:bg-white/30"
-        onClick={handleGoHome}
-      >
-        Home
-      </button>
+    <div className="min-h-screen xl:h-[100dvh] xl:overflow-hidden bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 py-4 sm:px-7 sm:py-6 flex flex-col">
+      <header className="grid h-[88px] w-full grid-cols-[84px_minmax(0,1fr)_84px] items-center xl:h-[96px]">
+        <div className="flex h-full items-center justify-start">
+          <button
+            type="button"
+            className="inline-flex h-10 min-w-[74px] items-center justify-center rounded-md bg-[#ff5a4a] px-4 text-sm font-bold tracking-wide text-white transition hover:-translate-y-0.5 hover:bg-[#ff4c3a] hover:ring-2 hover:ring-sky-300"
+            onClick={handleGoHome}
+          >
+            Home
+          </button>
+        </div>
 
-      <main className="mx-auto mt-4 grid w-full max-w-[1500px] gap-5 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
-        <section className="rounded-lg bg-zinc-100/95 p-4 shadow-[0_12px_25px_rgba(0,0,0,0.15)]">
+        <div className="hidden xl:flex flex-1 flex-col items-center justify-center">
+          <h2 className="text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wider text-white">
+            {roomHeadingText}
+          </h2>
+          {totalRounds > 0 && (
+            <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-white">
+              <p className="font-['Bebas_Neue'] text-2xl tracking-wide">
+                Round {Math.max(1, roundNumber)} / {displayedTotalRounds}
+              </p>
+              {phase === "playing" && (
+                <p className="font-['Bebas_Neue'] text-2xl tracking-wide">Time {timerLabel}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Spacer to keep center balanced */}
+        <div className="hidden xl:block" />
+      </header>
+
+      <main className="mx-auto mt-0 grid w-full flex-1 min-h-0 max-w-[1500px] items-stretch gap-5 overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)_360px]">
+        <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-zinc-100/95 p-4 shadow-[0_12px_25px_rgba(0,0,0,0.15)]">
           <h2 className="text-center font-['Bebas_Neue'] text-5xl tracking-wider text-[#1982b5]">Scores</h2>
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {players.map((player) => {
               const isPlayerHost = player.name.toLowerCase() === host.toLowerCase();
               const isPlayerDrawer = drawer ? player.name.toLowerCase() === drawer.toLowerCase() : false;
@@ -561,7 +597,7 @@ export default function Room({ routeRoomId }: RoomProps) {
 
               return (
                 <li key={player.name} className="rounded border border-zinc-300 bg-zinc-50 px-3 py-3 shadow-sm">
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="relative flex flex-col items-center justify-center px-8 text-center">
                     <div>
                       <p
                         className="text-xl font-bold"
@@ -570,7 +606,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                         {player.name}
                         {isYou ? " (you)" : ""}
                       </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
                         <span className="text-base font-semibold text-zinc-700">{player.score} pts</span>
                         {isPlayerHost && (
                           <span className="rounded bg-orange-500 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
@@ -585,7 +621,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       </div>
                     </div>
                     {phase === "playing" && isPlayerGuessed && !isPlayerDrawer && (
-                      <span className="mt-1 text-2xl font-black text-green-600">✓</span>
+                      <span className="absolute right-0 top-1/2 -translate-y-1/2 text-2xl font-black text-green-600">✓</span>
                     )}
                   </div>
                 </li>
@@ -594,21 +630,23 @@ export default function Room({ routeRoomId }: RoomProps) {
           </ul>
         </section>
 
-        <section className="flex flex-col">
-          <h2 className="text-center font-['Bebas_Neue'] text-6xl tracking-wider text-white">
-            {roomHeadingText}
-          </h2>
-          {totalRounds > 0 && (
-            <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-white">
-              <p className="font-['Bebas_Neue'] text-3xl tracking-wide">
-                Round {Math.max(1, roundNumber)} / {displayedTotalRounds}
-              </p>
-              {phase === "playing" && (
-                <p className="font-['Bebas_Neue'] text-3xl tracking-wide">Time {timerLabel}</p>
-              )}
-            </div>
-          )}
-          <div className="mt-3 flex justify-center">
+        <section className="flex min-h-0 flex-col overflow-y-auto">
+          <div className="xl:hidden flex flex-col">
+            <h2 className="text-center font-['Bebas_Neue'] text-6xl tracking-wider text-white">
+              {roomHeadingText}
+            </h2>
+            {totalRounds > 0 && (
+              <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-white">
+                <p className="font-['Bebas_Neue'] text-3xl tracking-wide">
+                  Round {Math.max(1, roundNumber)} / {displayedTotalRounds}
+                </p>
+                {phase === "playing" && (
+                  <p className="font-['Bebas_Neue'] text-3xl tracking-wide">Time {timerLabel}</p>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="mt-3 xl:mt-0 flex justify-center">
             <div className="relative w-full max-w-[760px]">
               <canvas
                 ref={canvasRef}
@@ -756,13 +794,13 @@ export default function Room({ routeRoomId }: RoomProps) {
           )}
         </section>
 
-        <section className={`rounded-lg bg-zinc-100/95 p-4 shadow-[0_12px_25px_rgba(0,0,0,0.15)] ${
+        <section className={`flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-zinc-100/95 p-4 shadow-[0_12px_25px_rgba(0,0,0,0.15)] ${
           isWaitingForDrawerWord ? "opacity-75" : ""
         }`}>
           <h2 className="text-center font-['Bebas_Neue'] text-5xl tracking-wider text-[#1982b5]">Chat</h2>
           <div
             ref={chatListRef}
-            className={`mt-3 h-[520px] overflow-y-scroll rounded border border-zinc-300 bg-zinc-50 p-2 ${
+            className={`mt-3 min-h-0 flex-1 overflow-y-auto rounded border border-zinc-300 bg-zinc-50 p-2 ${
               isWaitingForDrawerWord ? "grayscale-[0.2]" : ""
             }`}
           >
@@ -772,7 +810,7 @@ export default function Room({ routeRoomId }: RoomProps) {
               const guessColor = getChatColorForName(message.username);
 
               return (
-                <article key={message.id} className="mb-2 rounded bg-zinc-100 px-3 py-2 shadow-sm">
+                <article key={message.id} className="mb-2 w-full rounded bg-zinc-100 px-3 py-2 shadow-sm last:mb-0">
                   <p
                     className="text-sm font-bold"
                     style={isGuessMessage ? { color: guessColor } : undefined}
