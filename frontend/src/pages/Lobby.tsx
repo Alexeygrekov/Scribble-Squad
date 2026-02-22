@@ -100,16 +100,18 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 py-6 sm:px-8 sm:py-8">
-      <button
-        type="button"
-        className="rounded-md bg-white/20 px-4 py-2 text-sm font-bold tracking-wide text-white transition hover:bg-white/30"
-        onClick={handleGoHome}
-      >
-        Home
-      </button>
+    <div className="min-h-screen bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 pb-4 pt-0 sm:px-7 sm:pb-6 sm:pt-0">
+      <header className="flex h-[88px] items-center xl:h-[96px]">
+        <button
+          type="button"
+          className="inline-flex h-10 min-w-[74px] items-center justify-center rounded-md bg-orange-500 px-4 text-sm font-bold tracking-wide text-white transition hover:-translate-y-0.5 hover:bg-orange-600 hover:ring-2 hover:ring-sky-300"
+          onClick={handleGoHome}
+        >
+          Home
+        </button>
+      </header>
 
-      <main className="mx-auto mt-8 w-full max-w-5xl">
+      <main className="mx-auto mt-0 w-full max-w-5xl">
         <h1 className="font-['Bebas_Neue'] text-6xl leading-none tracking-widest text-white">Lobby</h1>
         <div className="mt-2 flex flex-wrap items-center gap-3 text-white">
           <p className="text-3xl font-semibold tracking-wide">

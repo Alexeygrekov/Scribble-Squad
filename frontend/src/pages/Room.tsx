@@ -2,6 +2,11 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type PointerEvent
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { chooseWord, clearCanvas, leaveLobby, sendGuess, sendStroke, undoStroke, type StrokePoint } from "../store";
 import { useRoomSocket } from "../useRoomSocket";
+import pencilIcon from "../assets/tools/pencil2.png";
+import eraserIcon from "../assets/tools/eraser2.png";
+import paintBucketIcon from "../assets/tools/paint_bucket2.png";
+import undoIcon from "../assets/tools/undo2.png";
+import trashBinIcon from "../assets/tools/trash_bin.png";
 
 const SESSION_KEY = "scribble_squad_tab_session";
 const ROOM_NOT_FOUND_ERROR = "Room not found.";
@@ -29,58 +34,6 @@ type DrawStroke = {
   size: number;
   points: StrokePoint[];
 };
-
-type IconProps = {
-  className?: string;
-};
-
-function BrushIcon({ className = "" }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
-      <path d="M13.5 4.5 19.5 10.5 8 22H2v-6z" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="m12 6 6 6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function EraserIcon({ className = "" }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
-      <path d="m4 15 7-9a2 2 0 0 1 3 0l6 7a2 2 0 0 1-.2 2.8l-1.5 1.3a2 2 0 0 1-1.3.5H9.5a2 2 0 0 1-1.5-.7L4 15Z" strokeLinejoin="round" />
-      <path d="M8.8 17.8h10.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function BucketIcon({ className = "" }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
-      <path d="m6 9 6-6 6 6-6 6-6-6Z" strokeLinejoin="round" />
-      <path d="M12 15v4" strokeLinecap="round" />
-      <path d="M17 17a2 2 0 0 1 4 0c0 1.2-.9 2.2-2 2.2s-2-1-2-2.2Z" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function UndoIcon({ className = "" }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
-      <path d="M9 7H4v5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M4 12a8 8 0 1 0 2.5-5.8L4 7" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function TrashIcon({ className = "" }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
-      <path d="M4 6h16" strokeLinecap="round" />
-      <path d="M8 6V4h8v2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="m6 6 1 14h10l1-14" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M10 11v6M14 11v6" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function createCursorDot(color: string, size: number) {
   const cursorSize = Math.max(14, Math.min(28, size + 10));
@@ -553,7 +506,7 @@ export default function Room({ routeRoomId }: RoomProps) {
   }
 
   return (
-    <div className="min-h-screen xl:h-[100dvh] xl:overflow-hidden bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 py-4 sm:px-7 sm:py-6 flex flex-col">
+    <div className="min-h-screen xl:h-[100dvh] xl:overflow-hidden bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 pb-4 pt-0 sm:px-7 sm:pb-6 sm:pt-0 flex flex-col">
       <header className="grid h-[88px] w-full grid-cols-[84px_minmax(0,1fr)_84px] items-center xl:h-[96px]">
         <div className="flex h-full items-center justify-start">
           <button
@@ -707,7 +660,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       }`}
                       onClick={() => setActiveTool("brush")}
                     >
-                      <BrushIcon className="h-5 w-5" />
+                      <img src={pencilIcon} alt="Brush tool" className="h-5 w-5 object-contain" draggable={false} />
                     </button>
                     <button
                       type="button"
@@ -720,7 +673,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       }`}
                       onClick={() => setActiveTool("eraser")}
                     >
-                      <EraserIcon className="h-5 w-5" />
+                      <img src={eraserIcon} alt="Eraser tool" className="h-5 w-5 object-contain" draggable={false} />
                     </button>
                     <button
                       type="button"
@@ -733,7 +686,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       }`}
                       onClick={() => setActiveTool("bucket")}
                     >
-                      <BucketIcon className="h-5 w-5" />
+                      <img src={paintBucketIcon} alt="Bucket tool" className="h-5 w-5 object-contain" draggable={false} />
                     </button>
                     <button
                       type="button"
@@ -744,7 +697,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       }`}
                       onClick={handleUndo}
                     >
-                      <UndoIcon className="h-5 w-5" />
+                      <img src={undoIcon} alt="Undo action" className="h-5 w-5 object-contain" draggable={false} />
                     </button>
                     <button
                       type="button"
@@ -755,7 +708,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       }`}
                       onClick={handleClearCanvas}
                     >
-                      <TrashIcon className="h-5 w-5" />
+                      <img src={trashBinIcon} alt="Delete action" className="h-5 w-5 object-contain" draggable={false} />
                     </button>
                   </div>
                 </div>
