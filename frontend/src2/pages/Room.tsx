@@ -86,6 +86,38 @@ function formatTimerLabel(totalSeconds: number) {
   return `${minutesPart}:${String(secondsPart).padStart(2, "0")}`;
 }
 
+function renderSystemMessageText(messageText: string) {
+  const correctGuessMatch = messageText.match(/^(.*guessed correctly!\s)(\+\d+\s+points\.)$/i);
+  if (correctGuessMatch) {
+    return (
+      <>
+        {correctGuessMatch[1]}
+        <span className="font-black text-green-700">{correctGuessMatch[2]}</span>
+      </>
+    );
+  }
+
+  const everyoneGuessedMatch = messageText.match(/^Round over! Everyone guessed the word (.+)\.$/i);
+  if (everyoneGuessedMatch) {
+    return (
+      <>
+        Round over! Everyone guessed the word <span className="font-black">{everyoneGuessedMatch[1]}</span>.
+      </>
+    );
+  }
+
+  const timeUpMatch = messageText.match(/^Time is up! The word was (.+)\.$/i);
+  if (timeUpMatch) {
+    return (
+      <>
+        Time is up! The word was <span className="font-black">{timeUpMatch[1]}</span>.
+      </>
+    );
+  }
+
+  return messageText;
+}
+
 export default function Room({ routeRoomId }: RoomProps) {
   const dispatch = useAppDispatch();
   const {
@@ -780,7 +812,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                     }`}
                     style={isGuessMessage ? { color: guessColor } : undefined}
                   >
-                    {message.text}
+                    {message.type === "system" ? renderSystemMessageText(message.text) : message.text}
                   </p>
                 </article>
               );

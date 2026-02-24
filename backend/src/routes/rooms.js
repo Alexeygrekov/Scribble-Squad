@@ -15,6 +15,10 @@ const ROOM_ID_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CHOOSE_WORD_OPTIONS = 3;
 const CHOOSE_WORD_DURATION_MS = 30_000;
 const ROUND_DURATION_MS = 90_000;
+const GUESS_ORDER_POINTS = [100, 80, 60, 40];
+const GUESS_ORDER_MIN_POINTS = 25;
+const GUESS_TIME_BONUS_MAX_POINTS = 25;
+const DRAWER_POINTS_PER_CORRECT_GUESS = 15;
 const MAX_CHAT_MESSAGES = 220;
 const WORDS = [
   "ice cream",
@@ -38,6 +42,16 @@ const roomUpdateSubscribers = new Set();
 
 function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, value));
+}
+
+function calculateGuesserPoints(guessOrder, roundEndsAt) {
+  const orderPoints = GUESS_ORDER_POINTS[guessOrder - 1] ?? GUESS_ORDER_MIN_POINTS;
+
+  const remainingMs = Number.isFinite(roundEndsAt) ? Math.max(0, roundEndsAt - Date.now()) : 0;
+  const timeRatio = ROUND_DURATION_MS > 0 ? clampNumber(remainingMs / ROUND_DURATION_MS, 0, 1) : 0;
+  const timeBonusPoints = Math.round(timeRatio * GUESS_TIME_BONUS_MAX_POINTS);
+
+  return orderPoints + timeBonusPoints;
 }
 
 function toOrdinal(value) {
@@ -215,7 +229,6 @@ function enterChoosingWordPhase(room, drawerName) {
   room.chooseEndsAt = Date.now() + CHOOSE_WORD_DURATION_MS;
   room.roundEndsAt = 0;
 
-  appendMessage(room, buildMessage("system", "System", `${drawerName} is picking a word...`));
   scheduleChooseWordTimeout(room);
 }
 
@@ -947,12 +960,11 @@ router.post("/:roomId/guess", (req, res) => {
     room.guessedPlayers.add(resolvedPlayer);
     const guessOrder = room.guessedPlayers.size;
     const totalGuessers = getTotalGuessers(room);
-    const guesserPoints = Math.max(120 - (guessOrder - 1) * 30, 30);
-    const drawerPoints = 15;
+    const guesserPoints = calculateGuesserPoints(guessOrder, room.roundEndsAt);
 
     room.scores[resolvedPlayer] = (room.scores[resolvedPlayer] || 0) + guesserPoints;
     if (room.drawer) {
-      room.scores[room.drawer] = (room.scores[room.drawer] || 0) + drawerPoints;
+      room.scores[room.drawer] = (room.scores[room.drawer] || 0) + DRAWER_POINTS_PER_CORRECT_GUESS;
     }
 
     appendMessage(
