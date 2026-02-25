@@ -25,6 +25,10 @@ function normalizePath(pathname: string) {
   return pathname.replace(/\/+$/, "");
 }
 
+function normalizeRoomId(value: string) {
+  return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9_-]/g, "");
+}
+
 function parseRoute(pathname: string): RouteState {
   if (pathname === "/") {
     return { kind: "home" };
@@ -41,6 +45,15 @@ function parseRoute(pathname: string): RouteState {
   }
 
   return { kind: "unknown" };
+}
+
+function parseJoinRoomId(search: string) {
+  const params = new URLSearchParams(search);
+  const joinValue = params.get("join");
+  if (!joinValue) {
+    return "";
+  }
+  return normalizeRoomId(joinValue);
 }
 
 function readStoredSession() {
@@ -80,27 +93,45 @@ function clearStoredSession() {
 export default function App() {
   const dispatch = useAppDispatch();
   const { status, roomId, username, phase } = useAppSelector((state) => state.connection);
-  const [pathname, setPathname] = useState(() => normalizePath(window.location.pathname));
-  const route = useMemo(() => parseRoute(pathname), [pathname]);
+  const [locationState, setLocationState] = useState(() => ({
+    pathname: normalizePath(window.location.pathname),
+    search: window.location.search
+  }));
+  const route = useMemo(() => parseRoute(locationState.pathname), [locationState.pathname]);
+  const joinRoomId = useMemo(() => parseJoinRoomId(locationState.search), [locationState.search]);
   const [isRestoring, setIsRestoring] = useState(() => route.kind === "lobby" || route.kind === "room");
   const attemptedRestoreRef = useRef<string | null>(null);
 
-  const navigate = useCallback((nextPath: string, replace = false) => {
-    const normalizedNextPath = normalizePath(nextPath);
-    if (normalizePath(window.location.pathname) === normalizedNextPath) {
+  const navigate = useCallback((nextUrl: string, replace = false) => {
+    const parsedUrl = new URL(nextUrl, window.location.origin);
+    const normalizedNextPath = normalizePath(parsedUrl.pathname);
+    const normalizedNextSearch = parsedUrl.search;
+    const currentPath = normalizePath(window.location.pathname);
+    const currentSearch = window.location.search;
+
+    if (currentPath === normalizedNextPath && currentSearch === normalizedNextSearch) {
       return;
     }
 
+    const normalizedTarget = `${normalizedNextPath}${normalizedNextSearch}`;
     if (replace) {
-      window.history.replaceState(null, "", normalizedNextPath);
+      window.history.replaceState(null, "", normalizedTarget);
     } else {
-      window.history.pushState(null, "", normalizedNextPath);
+      window.history.pushState(null, "", normalizedTarget);
     }
-    setPathname(normalizedNextPath);
+    setLocationState({
+      pathname: normalizedNextPath,
+      search: normalizedNextSearch
+    });
   }, []);
 
   useEffect(() => {
-    const onPopState = () => setPathname(normalizePath(window.location.pathname));
+    const onPopState = () => {
+      setLocationState({
+        pathname: normalizePath(window.location.pathname),
+        search: window.location.search
+      });
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -148,7 +179,7 @@ export default function App() {
 
     if (attemptedRestoreRef.current === routeRoomId) {
       setIsRestoring(false);
-      navigate("/", true);
+      navigate(`/?join=${encodeURIComponent(routeRoomId)}`, true);
       return;
     }
 
@@ -158,7 +189,7 @@ export default function App() {
     const storedSession = readStoredSession();
     if (!storedSession || storedSession.roomId !== routeRoomId) {
       setIsRestoring(false);
-      navigate("/", true);
+      navigate(`/?join=${encodeURIComponent(routeRoomId)}`, true);
       return;
     }
 
@@ -181,5 +212,5 @@ export default function App() {
     return <Room routeRoomId={route.roomId} />;
   }
 
-  return <Home />;
+  return <Home initialJoinRoomId={route.kind === "home" ? joinRoomId : ""} />;
 }

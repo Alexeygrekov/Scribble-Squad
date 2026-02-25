@@ -451,7 +451,6 @@ export default function Room({ routeRoomId }: RoomProps) {
     const firstPlace = rankedPlayers[0] || null;
     const secondPlace = rankedPlayers[1] || null;
     const thirdPlace = rankedPlayers[2] || null;
-    const remainingPlayers = rankedPlayers.slice(3);
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 py-6 sm:px-8 sm:py-8">
@@ -517,11 +516,6 @@ export default function Room({ routeRoomId }: RoomProps) {
                   <p className="text-lg font-semibold text-zinc-700">{player.score} pts</p>
                 </li>
               ))}
-              {remainingPlayers.length === 0 && rankedPlayers.length <= 3 && (
-                <li className="rounded border border-zinc-300 bg-zinc-50 px-3 py-2 text-center text-lg font-semibold text-zinc-700">
-                  Everyone made the podium.
-                </li>
-              )}
             </ul>
           </section>
 

@@ -69,12 +69,13 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
     dispatch(leaveLobby());
   }, [dispatch, error]);
 
-  async function handleCopyRoomId() {
+  async function handleCopyRoomLink() {
     try {
       if (!displayRoomId) {
         throw new Error("No room ID");
       }
-      await copyToClipboard(displayRoomId);
+      const inviteUrl = new URL(`/lobby/${encodeURIComponent(displayRoomId)}`, window.location.origin).toString();
+      await copyToClipboard(inviteUrl);
       setCopyState("copied");
     } catch {
       setCopyState("error");
@@ -120,9 +121,9 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
           <button
             type="button"
             className="rounded bg-white/20 px-3 py-1.5 text-sm font-bold tracking-wide text-white transition hover:bg-white/30"
-            onClick={handleCopyRoomId}
+            onClick={handleCopyRoomLink}
           >
-            {copyState === "copied" ? "Copied" : "Copy ID"}
+            {copyState === "copied" ? "Copied" : "Copy Link"}
           </button>
           {copyState === "error" && <span className="text-sm font-semibold text-red-100">Copy failed</span>}
         </div>
@@ -156,7 +157,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
 
         <button
           type="button"
-          className="mt-5 w-full bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition enabled:hover:bg-[#ff4c3a] disabled:cursor-not-allowed disabled:opacity-65"
+          className="mt-5 w-full rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition duration-150 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-65"
           disabled={!canStart}
           onClick={handleStartGame}
         >
