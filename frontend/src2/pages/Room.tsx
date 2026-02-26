@@ -12,6 +12,8 @@ const SESSION_KEY = "scribble_squad_tab_session";
 const ROOM_NOT_FOUND_ERROR = "Room not found.";
 const CANVAS_WIDTH = 760;
 const CANVAS_HEIGHT = 620;
+const ROUND_DURATION_SECONDS = 90;
+const CHOOSE_WORD_DURATION_SECONDS = 30;
 const CANVAS_BACKGROUND = "#ececec";
 const DRAW_COLORS = [
   "#FFFFFF", "#9CA3AF", "#FFF000", "#FFB000", "#FF1500", "#D59549", "#F0B6CF", "#E90CF0", "#1717E0", "#17E5E5", "#00FF00",
@@ -86,6 +88,16 @@ function formatTimerLabel(totalSeconds: number) {
   return `${minutesPart}:${String(secondsPart).padStart(2, "0")}`;
 }
 
+function clampRatio(value: number) {
+  return Math.min(1, Math.max(0, value));
+}
+
+function getTimerProgressColor(progressRatio: number) {
+  const clamped = clampRatio(progressRatio);
+  const hue = Math.round(clamped * 120);
+  return `hsl(${hue} 78% 44%)`;
+}
+
 function renderSystemMessageText(messageText: string) {
   const correctGuessMatch = messageText.match(/^(.*guessed correctly!\s)(\+\d+\s+points\.)$/i);
   if (correctGuessMatch) {
@@ -157,12 +169,6 @@ export default function Room({ routeRoomId }: RoomProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chatListRef = useRef<HTMLDivElement | null>(null);
 
-  const formattedWord = useMemo(() => {
-    if (!wordDisplay) {
-      return "";
-    }
-    return canDraw ? wordDisplay.toUpperCase() : wordDisplay.split("").join(" ");
-  }, [canDraw, wordDisplay]);
   const activeStrokeColor = activeTool === "eraser" ? CANVAS_BACKGROUND : brushColor;
   const drawerCursor = useMemo(() => createCursorDot(brushColor, brushSize), [brushColor, brushSize]);
   const isDrawer = Boolean(drawer) && drawer.toLowerCase() === username.toLowerCase();
@@ -183,17 +189,47 @@ export default function Room({ routeRoomId }: RoomProps) {
   const timerSecondsLeft = phase === "playing" && roundEndsAt > 0
     ? Math.max(0, Math.ceil((roundEndsAt - nowTs) / 1000))
     : 0;
-  const timerLabel = formatTimerLabel(timerSecondsLeft);
   const displayedTotalRounds = Math.max(totalRounds, roundsCompleted, 1);
   const rankedPlayers = useMemo(
     () => [...players].sort((left, right) => right.score - left.score || left.name.localeCompare(right.name)),
     [players]
   );
-  const roomHeadingText = isDrawerChoosingWord
-    ? "Pick A Word"
-    : isWaitingForDrawerWord
-      ? "Drawer is picking their word"
-      : (canDraw ? `Your Word: ${formattedWord}` : `Word: ${formattedWord}`);
+  const navWordValue = useMemo(() => {
+    if (isDrawerChoosingWord) {
+      return "Picking...";
+    }
+    if (isWaitingForDrawerWord) {
+      return "______";
+    }
+    if (!wordDisplay) {
+      return "______";
+    }
+    return wordDisplay;
+  }, [isDrawerChoosingWord, isWaitingForDrawerWord, wordDisplay]);
+  const maskedLetterCount = useMemo(() => {
+    if (canDraw || phase !== "playing") {
+      return 0;
+    }
+    return (wordDisplay.match(/_/g) || []).length;
+  }, [canDraw, phase, wordDisplay]);
+  const navRoundLabel = `Round ${Math.max(1, roundNumber)} of ${displayedTotalRounds}`;
+  const navTimerSeconds = phase === "playing"
+    ? timerSecondsLeft
+    : phase === "choosing_word"
+      ? chooseSecondsLeft
+      : 0;
+  const navTimerLabel = `${phase === "choosing_word" ? "Pick" : "Time"} ${formatTimerLabel(navTimerSeconds)}`;
+  const navProgressRatio = useMemo(() => {
+    if (phase === "playing") {
+      return clampRatio(timerSecondsLeft / ROUND_DURATION_SECONDS);
+    }
+    if (phase === "choosing_word") {
+      return clampRatio(chooseSecondsLeft / CHOOSE_WORD_DURATION_SECONDS);
+    }
+    return 0;
+  }, [chooseSecondsLeft, phase, timerSecondsLeft]);
+  const navProgressWidth = `${Math.round(navProgressRatio * 100)}%`;
+  const navProgressColor = getTimerProgressColor(navProgressRatio);
   const waitingOverlayText = `${drawerDisplayName} is thinking real hard ${chooseSecondsLeft} seconds to pick`;
 
   useRoomSocket({ roomId: displayRoomId, username });
@@ -533,8 +569,8 @@ export default function Room({ routeRoomId }: RoomProps) {
 
   return (
     <div className="min-h-screen xl:h-[100dvh] xl:overflow-hidden bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 pb-4 pt-0 sm:px-7 sm:pb-6 sm:pt-0 flex flex-col">
-      <header className="grid h-[88px] w-full grid-cols-[84px_minmax(0,1fr)_84px] items-center xl:h-[96px]">
-        <div className="flex h-full items-center justify-start">
+      <header className="w-full">
+        <div className="flex h-[52px] items-center">
           <button
             type="button"
             className="inline-flex h-10 min-w-[74px] items-center justify-center rounded-md bg-[#ff5a4a] px-4 text-sm font-bold tracking-wide text-white transition hover:-translate-y-0.5 hover:bg-[#ff4c3a] hover:ring-2 hover:ring-sky-300"
@@ -543,28 +579,37 @@ export default function Room({ routeRoomId }: RoomProps) {
             Home
           </button>
         </div>
-
-        <div className="hidden xl:flex flex-1 flex-col items-center justify-center">
-          <h2 className="text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wider text-white">
-            {roomHeadingText}
-          </h2>
-          {totalRounds > 0 && (
-            <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-white">
-              <p className="font-['Bebas_Neue'] text-2xl tracking-wide">
-                Round {Math.max(1, roundNumber)} / {displayedTotalRounds}
-              </p>
-              {phase === "playing" && (
-                <p className="font-['Bebas_Neue'] text-2xl tracking-wide">Time {timerLabel}</p>
-              )}
+        <div className="mx-auto w-full max-w-[1500px] rounded-lg bg-zinc-100/95 px-4 py-3 shadow-[0_12px_25px_rgba(0,0,0,0.15)] sm:px-5">
+          <div className="grid items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
+            <p className="text-base font-semibold text-zinc-800 sm:text-lg">
+              {navRoundLabel}
+            </p>
+            <p className="text-center text-2xl font-black text-zinc-900 sm:text-3xl">
+              Word:{" "}
+              <span className="inline-flex items-start whitespace-pre text-zinc-900">
+                <span>{navWordValue}</span>
+                {!canDraw && phase === "playing" && maskedLetterCount > 0 && (
+                  <sup className="-mt-1 ml-1 text-xs font-semibold text-zinc-500">{maskedLetterCount}</sup>
+                )}
+              </span>
+            </p>
+            <div className="justify-self-stretch md:justify-self-end md:w-[240px]">
+              <p className="text-right text-sm font-semibold text-zinc-700">{navTimerLabel}</p>
+              <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-zinc-300/90">
+                <div
+                  className="h-full rounded-full transition-[width,background-color] duration-300"
+                  style={{
+                    width: navProgressWidth,
+                    backgroundColor: navProgressColor
+                  }}
+                />
+              </div>
             </div>
-          )}
+          </div>
         </div>
-
-        {/* Spacer to keep center balanced */}
-        <div className="hidden xl:block" />
       </header>
 
-      <main className="mx-auto mt-0 grid w-full flex-1 min-h-0 max-w-[1500px] items-stretch gap-5 overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)_360px]">
+      <main className="mx-auto mt-4 grid w-full flex-1 min-h-0 max-w-[1500px] items-stretch gap-5 overflow-hidden xl:grid-cols-[320px_minmax(0,1fr)_360px]">
         <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-zinc-100/95 p-4 shadow-[0_12px_25px_rgba(0,0,0,0.15)]">
           <h2 className="text-center font-['Bebas_Neue'] text-5xl tracking-wider text-[#1982b5]">Scores</h2>
           <ul className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
@@ -610,22 +655,7 @@ export default function Room({ routeRoomId }: RoomProps) {
         </section>
 
         <section className="flex min-h-0 flex-col overflow-y-auto">
-          <div className="xl:hidden flex flex-col">
-            <h2 className="text-center font-['Bebas_Neue'] text-6xl tracking-wider text-white">
-              {roomHeadingText}
-            </h2>
-            {totalRounds > 0 && (
-              <div className="mt-1 flex flex-wrap items-center justify-center gap-4 text-white">
-                <p className="font-['Bebas_Neue'] text-3xl tracking-wide">
-                  Round {Math.max(1, roundNumber)} / {displayedTotalRounds}
-                </p>
-                {phase === "playing" && (
-                  <p className="font-['Bebas_Neue'] text-3xl tracking-wide">Time {timerLabel}</p>
-                )}
-              </div>
-            )}
-          </div>
-          <div className="mt-3 xl:mt-0 flex justify-center">
+          <div className="flex justify-center">
             <div className="relative w-full max-w-[760px]">
               <canvas
                 ref={canvasRef}
