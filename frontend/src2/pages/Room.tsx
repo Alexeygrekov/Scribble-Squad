@@ -13,7 +13,7 @@ const ROOM_NOT_FOUND_ERROR = "Room not found.";
 const CANVAS_WIDTH = 760;
 const CANVAS_HEIGHT = 620;
 const ROUND_DURATION_SECONDS = 90;
-const CHOOSE_WORD_DURATION_SECONDS = 30;
+const CHOOSE_WORD_DURATION_SECONDS = 20;
 const CANVAS_BACKGROUND = "#ececec";
 const DRAW_COLORS = [
   "#FFFFFF", "#9CA3AF", "#FFF000", "#FFB000", "#FF1500", "#D59549", "#F0B6CF", "#E90CF0", "#1717E0", "#17E5E5", "#00FF00",
@@ -212,6 +212,7 @@ export default function Room({ routeRoomId }: RoomProps) {
     }
     return (wordDisplay.match(/_/g) || []).length;
   }, [canDraw, phase, wordDisplay]);
+  const shouldTrackMaskedWord = !canDraw && /_/.test(navWordValue);
   const navRoundLabel = `Round ${Math.max(1, roundNumber)} of ${displayedTotalRounds}`;
   const navTimerSeconds = phase === "playing"
     ? timerSecondsLeft
@@ -568,26 +569,26 @@ export default function Room({ routeRoomId }: RoomProps) {
   }
 
   return (
-    <div className="min-h-screen xl:h-[100dvh] xl:overflow-hidden bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 pb-4 pt-0 sm:px-7 sm:pb-6 sm:pt-0 flex flex-col">
+    <div className="min-h-screen xl:h-[100dvh] xl:overflow-hidden bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 pb-4 pt-4 sm:px-7 sm:pb-6 sm:pt-4 flex flex-col">
       <header className="w-full">
-        <div className="flex h-[52px] items-center">
-          <button
-            type="button"
-            className="inline-flex h-10 min-w-[74px] items-center justify-center rounded-md bg-[#ff5a4a] px-4 text-sm font-bold tracking-wide text-white transition hover:-translate-y-0.5 hover:bg-[#ff4c3a] hover:ring-2 hover:ring-sky-300"
-            onClick={handleGoHome}
-          >
-            Home
-          </button>
-        </div>
         <div className="mx-auto w-full max-w-[1500px] rounded-lg bg-zinc-100/95 px-4 py-3 shadow-[0_12px_25px_rgba(0,0,0,0.15)] sm:px-5">
           <div className="grid items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
-            <p className="text-base font-semibold text-zinc-800 sm:text-lg">
-              {navRoundLabel}
-            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="inline-flex h-10 min-w-[74px] items-center justify-center rounded-md bg-[#ff5a4a] px-4 text-sm font-bold tracking-wide text-white transition hover:-translate-y-0.5 hover:bg-[#ff4c3a] hover:ring-2 hover:ring-sky-300"
+                onClick={handleGoHome}
+              >
+                Home
+              </button>
+              <p className="text-base font-semibold text-zinc-800 sm:text-lg">
+                {navRoundLabel}
+              </p>
+            </div>
             <p className="text-center text-2xl font-black text-zinc-900 sm:text-3xl">
               Word:{" "}
               <span className="inline-flex items-start whitespace-pre text-zinc-900">
-                <span>{navWordValue}</span>
+                <span className={shouldTrackMaskedWord ? "tracking-[0.14em]" : ""}>{navWordValue}</span>
                 {!canDraw && phase === "playing" && maskedLetterCount > 0 && (
                   <sup className="-mt-1 ml-1 text-xs font-semibold text-zinc-500">{maskedLetterCount}</sup>
                 )}
@@ -711,8 +712,8 @@ export default function Room({ routeRoomId }: RoomProps) {
                       aria-label="Brush"
                       className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                         activeTool === "brush"
-                          ? "bg-white/15 text-white ring-2 ring-sky-400"
-                          : "bg-white/15 text-white"
+                          ? "bg-[#ff5a4a] text-white ring-2 ring-sky-400"
+                          : "bg-[#ff5a4a] text-white"
                       }`}
                       onClick={() => setActiveTool("brush")}
                     >
@@ -724,8 +725,8 @@ export default function Room({ routeRoomId }: RoomProps) {
                       aria-label="Eraser"
                       className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                         activeTool === "eraser"
-                          ? "bg-white/15 text-white ring-2 ring-sky-400"
-                          : "bg-white/15 text-white"
+                          ? "bg-[#ff5a4a] text-white ring-2 ring-sky-400"
+                          : "bg-[#ff5a4a] text-white"
                       }`}
                       onClick={() => setActiveTool("eraser")}
                     >
@@ -737,8 +738,8 @@ export default function Room({ routeRoomId }: RoomProps) {
                       aria-label="Bucket"
                       className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                         activeTool === "bucket"
-                          ? "bg-white/15 text-white ring-2 ring-sky-400"
-                          : "bg-white/15 text-white"
+                          ? "bg-[#ff5a4a] text-white ring-2 ring-sky-400"
+                          : "bg-[#ff5a4a] text-white"
                       }`}
                       onClick={() => setActiveTool("bucket")}
                     >
@@ -749,7 +750,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       title="Undo"
                       aria-label="Undo"
                       className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md text-white transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
-                        activeAction === "undo" ? "bg-sky-500" : "bg-white/15"
+                        activeAction === "undo" ? "bg-sky-500" : "bg-[#ff5a4a]"
                       }`}
                       onClick={handleUndo}
                     >
@@ -760,7 +761,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       title="Delete"
                       aria-label="Delete"
                       className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md text-white transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
-                        activeAction === "delete" ? "bg-sky-500" : "bg-white/15"
+                        activeAction === "delete" ? "bg-sky-500" : "bg-[#ff5a4a]"
                       }`}
                       onClick={handleClearCanvas}
                     >
@@ -776,7 +777,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                         key={sizeOption}
                         type="button"
                         title={`${sizeOption}px`}
-                        className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md bg-white/15 transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                        className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md bg-[#ff5a4a] transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                           brushSize === sizeOption ? "ring-2 ring-sky-400" : ""
                         }`}
                         onClick={() => setBrushSize(sizeOption)}
