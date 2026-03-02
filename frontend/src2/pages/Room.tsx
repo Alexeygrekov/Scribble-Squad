@@ -7,6 +7,7 @@ import eraserIcon from "../assets/tools/eraser2.png";
 import paintBucketIcon from "../assets/tools/paint_bucket2.png";
 import undoIcon from "../assets/tools/undo2.png";
 import trashBinIcon from "../assets/tools/trash_bin.png";
+import alarmClockIcon from "../assets/ui/alarm_clock.png";
 
 const SESSION_KEY = "scribble_squad_tab_session";
 const ROOM_NOT_FOUND_ERROR = "Room not found.";
@@ -219,7 +220,6 @@ export default function Room({ routeRoomId }: RoomProps) {
     : phase === "choosing_word"
       ? chooseSecondsLeft
       : 0;
-  const navTimerLabel = `${phase === "choosing_word" ? "Pick" : "Time"} ${formatTimerLabel(navTimerSeconds)}`;
   const navProgressRatio = useMemo(() => {
     if (phase === "playing") {
       return clampRatio(timerSecondsLeft / ROUND_DURATION_SECONDS);
@@ -595,8 +595,20 @@ export default function Room({ routeRoomId }: RoomProps) {
               </span>
             </p>
             <div className="justify-self-stretch md:justify-self-end md:w-[240px]">
-              <p className="text-right text-sm font-semibold text-zinc-700">{navTimerLabel}</p>
-              <div className="mt-1 h-2.5 w-full overflow-hidden rounded-full bg-zinc-300/90">
+              <div className="mb-1 flex justify-center">
+                <div className="relative h-14 w-14 shrink-0">
+                  <img
+                    src={alarmClockIcon}
+                    alt="Round timer"
+                    className="h-full w-full select-none object-contain pointer-events-none"
+                    draggable={false}
+                  />
+                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center text-[13px] font-black tracking-wide text-zinc-900">
+                    {formatTimerLabel(navTimerSeconds)}
+                  </span>
+                </div>
+              </div>
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-300/90">
                 <div
                   className="h-full rounded-full transition-[width,background-color] duration-300"
                   style={{
