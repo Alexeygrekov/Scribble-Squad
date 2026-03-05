@@ -558,7 +558,7 @@ export default function Room({ routeRoomId }: RoomProps) {
 
           <button
             type="button"
-            className="mx-auto mt-6 block w-full max-w-3xl bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition duration-150 hover:-translate-y-0.5 hover:scale-[1.01] hover:bg-[#ff4c3a] hover:ring-2 hover:ring-sky-400"
+            className="mx-auto mt-6 block w-full max-w-3xl rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition duration-150 hover:-translate-y-0.5 hover:scale-[1.01] hover:bg-[#ff4c3a] hover:ring-2 hover:ring-sky-400"
             onClick={handleGoHome}
           >
             Play Again
@@ -572,7 +572,7 @@ export default function Room({ routeRoomId }: RoomProps) {
     <div className="min-h-screen xl:h-[100dvh] xl:overflow-hidden bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 pb-4 pt-4 sm:px-7 sm:pb-6 sm:pt-4 flex flex-col">
       <header className="w-full">
         <div className="mx-auto w-full max-w-[1500px] rounded-lg bg-zinc-100/95 px-4 py-3 shadow-[0_12px_25px_rgba(0,0,0,0.15)] sm:px-5">
-          <div className="grid items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
+          <div className="grid items-center gap-3 md:grid-cols-[1fr_auto_1fr] xl:grid-cols-[320px_minmax(0,1fr)_360px]">
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -594,7 +594,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                 )}
               </span>
             </p>
-            <div className="justify-self-stretch md:justify-self-end md:w-[240px]">
+            <div className="w-full justify-self-stretch md:w-[328px] md:max-w-[328px] md:justify-self-end">
               <div className="mb-1 flex justify-center">
                 <div className="relative h-14 w-14 shrink-0">
                   <img
@@ -626,7 +626,7 @@ export default function Room({ routeRoomId }: RoomProps) {
         <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg bg-zinc-100/95 p-4 shadow-[0_12px_25px_rgba(0,0,0,0.15)]">
           <h2 className="text-center font-['Bebas_Neue'] text-5xl tracking-wider text-[#1982b5]">Scores</h2>
           <ul className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-            {players.map((player) => {
+            {rankedPlayers.map((player, index) => {
               const isPlayerHost = player.name.toLowerCase() === host.toLowerCase();
               const isPlayerDrawer = drawer ? player.name.toLowerCase() === drawer.toLowerCase() : false;
               const isYou = player.name.toLowerCase() === username.toLowerCase();
@@ -634,7 +634,10 @@ export default function Room({ routeRoomId }: RoomProps) {
 
               return (
                 <li key={player.name} className="rounded border border-zinc-300 bg-zinc-50 px-3 py-3 shadow-sm">
-                  <div className="relative flex flex-col items-center justify-center px-8 text-center">
+                  <div className="relative flex flex-col items-center justify-center pl-10 pr-8 text-center">
+                    <span className="absolute left-0 top-1/2 -translate-y-1/2 text-base font-black text-zinc-600">
+                      #{index + 1}
+                    </span>
                     <div>
                       <p
                         className="text-xl font-bold"
@@ -724,8 +727,8 @@ export default function Room({ routeRoomId }: RoomProps) {
                       aria-label="Brush"
                       className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                         activeTool === "brush"
-                          ? "bg-[#ff5a4a] text-white ring-2 ring-sky-400"
-                          : "bg-[#ff5a4a] text-white"
+                          ? "bg-slate-600 text-white ring-2 ring-sky-400"
+                          : "bg-slate-600 text-white"
                       }`}
                       onClick={() => setActiveTool("brush")}
                     >
@@ -737,8 +740,8 @@ export default function Room({ routeRoomId }: RoomProps) {
                       aria-label="Eraser"
                       className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                         activeTool === "eraser"
-                          ? "bg-[#ff5a4a] text-white ring-2 ring-sky-400"
-                          : "bg-[#ff5a4a] text-white"
+                          ? "bg-slate-600 text-white ring-2 ring-sky-400"
+                          : "bg-slate-600 text-white"
                       }`}
                       onClick={() => setActiveTool("eraser")}
                     >
@@ -750,8 +753,8 @@ export default function Room({ routeRoomId }: RoomProps) {
                       aria-label="Bucket"
                       className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                         activeTool === "bucket"
-                          ? "bg-[#ff5a4a] text-white ring-2 ring-sky-400"
-                          : "bg-[#ff5a4a] text-white"
+                          ? "bg-slate-600 text-white ring-2 ring-sky-400"
+                          : "bg-slate-600 text-white"
                       }`}
                       onClick={() => setActiveTool("bucket")}
                     >
@@ -762,7 +765,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       title="Undo"
                       aria-label="Undo"
                       className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md text-white transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
-                        activeAction === "undo" ? "bg-sky-500" : "bg-[#ff5a4a]"
+                        activeAction === "undo" ? "bg-sky-500" : "bg-slate-600"
                       }`}
                       onClick={handleUndo}
                     >
@@ -773,7 +776,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                       title="Delete"
                       aria-label="Delete"
                       className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md text-white transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
-                        activeAction === "delete" ? "bg-sky-500" : "bg-[#ff5a4a]"
+                        activeAction === "delete" ? "bg-sky-500" : "bg-slate-600"
                       }`}
                       onClick={handleClearCanvas}
                     >
@@ -789,7 +792,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                         key={sizeOption}
                         type="button"
                         title={`${sizeOption}px`}
-                        className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md bg-[#ff5a4a] transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
+                        className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-md bg-slate-600 transition-transform duration-150 hover:-translate-y-0.5 hover:scale-105 ${
                           brushSize === sizeOption ? "ring-2 ring-sky-400" : ""
                         }`}
                         onClick={() => setBrushSize(sizeOption)}
