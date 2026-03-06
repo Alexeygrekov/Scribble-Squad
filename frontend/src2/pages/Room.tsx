@@ -99,6 +99,75 @@ function getTimerProgressColor(progressRatio: number) {
   return `hsl(${hue} 78% 44%)`;
 }
 
+function createPodiumConfettiPieces(rank: 1 | 2 | 3) {
+  const count = rank === 1 ? 28 : rank === 2 ? 18 : 12;
+  const maxSpread = rank === 1 ? 42 : rank === 2 ? 34 : 26;
+  const minSpread = rank === 1 ? 8 : rank === 2 ? 7 : 6;
+  const centerSize = rank === 1 ? 11 : rank === 2 ? 9 : 8;
+  const edgeSize = rank === 1 ? 7 : rank === 2 ? 6 : 5;
+  const duration = rank === 1 ? 860 : rank === 2 ? 720 : 600;
+  const delay = 120;
+  const colorScale = rank === 1
+    ? ["#fde047", "#f59e0b", "#ef4444", "#22c55e", "#3b82f6", "#a855f7"]
+    : rank === 2
+      ? ["#facc15", "#f59e0b", "#ef4444", "#22c55e", "#3b82f6"]
+      : ["#f59e0b", "#ef4444", "#22c55e", "#3b82f6"];
+  const pairCount = Math.floor((count - 2) / 2);
+  const pieces: Array<{
+    left: number;
+    size: number;
+    variant: "left" | "center" | "right";
+    delay: number;
+    duration: number;
+    color: string;
+    borderRadius: string;
+  }> = [];
+
+  for (let centerIndex = 0; centerIndex < 2; centerIndex += 1) {
+    pieces.push({
+      left: centerIndex === 0 ? 48.8 : 51.2,
+      size: centerSize,
+      variant: "center",
+      delay,
+      duration,
+      color: colorScale[0],
+      borderRadius: centerIndex === 0 ? "9999px" : "2px"
+    });
+  }
+
+  for (let pairIndex = 0; pairIndex < pairCount; pairIndex += 1) {
+    const pairRatio = pairCount > 1 ? pairIndex / (pairCount - 1) : 1;
+    const spread = minSpread + pairRatio * (maxSpread - minSpread);
+    const leftPos = Math.max(8, 50 - spread);
+    const rightPos = Math.min(92, 50 + spread);
+    const size = Math.max(edgeSize, Math.round(centerSize - pairRatio * (centerSize - edgeSize)));
+    const colorIndex = Math.min(colorScale.length - 1, Math.floor(pairRatio * (colorScale.length - 1)));
+    const color = colorScale[colorIndex];
+    const borderRadius = pairIndex % 2 === 0 ? "9999px" : "2px";
+
+    pieces.push({
+      left: leftPos,
+      size,
+      variant: "left",
+      delay,
+      duration,
+      color,
+      borderRadius
+    });
+    pieces.push({
+      left: rightPos,
+      size,
+      variant: "right",
+      delay,
+      duration,
+      color,
+      borderRadius
+    });
+  }
+
+  return pieces.slice(0, count);
+}
+
 function renderSystemMessageText(messageText: string) {
   const correctGuessMatch = messageText.match(/^(.*guessed correctly!\s)(\+\d+\s+points\.)$/i);
   if (correctGuessMatch) {
@@ -488,6 +557,9 @@ export default function Room({ routeRoomId }: RoomProps) {
     const firstPlace = rankedPlayers[0] || null;
     const secondPlace = rankedPlayers[1] || null;
     const thirdPlace = rankedPlayers[2] || null;
+    const firstPlaceConfetti = createPodiumConfettiPieces(1);
+    const secondPlaceConfetti = createPodiumConfettiPieces(2);
+    const thirdPlaceConfetti = createPodiumConfettiPieces(3);
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 py-6 sm:px-8 sm:py-8">
@@ -498,12 +570,31 @@ export default function Room({ routeRoomId }: RoomProps) {
           <section className="mx-auto mt-8 grid max-w-4xl items-end gap-4 sm:grid-cols-3">
             <div className="order-1 sm:order-1">
               {secondPlace ? (
-                <div className="rounded-lg border-2 border-zinc-400 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
-                  <p className="font-['Bebas_Neue'] text-6xl leading-none text-zinc-600">2nd</p>
-                  <p className="mt-2 text-3xl font-black" style={{ color: getChatColorForName(secondPlace.name) }}>
-                    {secondPlace.name}
-                  </p>
-                  <p className="text-xl font-semibold text-zinc-700">{secondPlace.score} pts</p>
+                <div className="podium-card group relative overflow-visible rounded-lg border-2 border-zinc-400 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                  <div className="podium-card-inner">
+                    <p className="font-['Bebas_Neue'] text-6xl leading-none text-zinc-600">2nd</p>
+                    <p className="mt-2 text-3xl font-black" style={{ color: getChatColorForName(secondPlace.name) }}>
+                      {secondPlace.name}
+                    </p>
+                    <p className="text-xl font-semibold text-zinc-700">{secondPlace.score} pts</p>
+                  </div>
+                  <div className="podium-confetti" aria-hidden="true">
+                    {secondPlaceConfetti.map((piece, index) => (
+                      <span
+                        key={`podium-2-${index}`}
+                        className={`confetti-piece confetti-${piece.variant}`}
+                        style={{
+                          left: `${piece.left}%`,
+                          width: `${piece.size}px`,
+                          height: `${Math.max(5, Math.round(piece.size * 0.7))}px`,
+                          backgroundColor: piece.color,
+                          borderRadius: piece.borderRadius,
+                          animationDelay: `${piece.delay}ms`,
+                          animationDuration: `${piece.duration}ms`
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div />
@@ -512,12 +603,31 @@ export default function Room({ routeRoomId }: RoomProps) {
 
             <div className="order-2 sm:order-2">
               {firstPlace ? (
-                <div className="rounded-lg border-2 border-amber-300 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
-                  <p className="font-['Bebas_Neue'] text-6xl leading-none text-amber-500">1st</p>
-                  <p className="mt-2 text-4xl font-black" style={{ color: getChatColorForName(firstPlace.name) }}>
-                    {firstPlace.name}
-                  </p>
-                  <p className="text-2xl font-semibold text-zinc-700">{firstPlace.score} pts</p>
+                <div className="podium-card group relative overflow-visible rounded-lg border-2 border-amber-300 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                  <div className="podium-card-inner">
+                    <p className="font-['Bebas_Neue'] text-6xl leading-none text-amber-500">1st</p>
+                    <p className="mt-2 text-4xl font-black" style={{ color: getChatColorForName(firstPlace.name) }}>
+                      {firstPlace.name}
+                    </p>
+                    <p className="text-2xl font-semibold text-zinc-700">{firstPlace.score} pts</p>
+                  </div>
+                  <div className="podium-confetti" aria-hidden="true">
+                    {firstPlaceConfetti.map((piece, index) => (
+                      <span
+                        key={`podium-1-${index}`}
+                        className={`confetti-piece confetti-${piece.variant}`}
+                        style={{
+                          left: `${piece.left}%`,
+                          width: `${piece.size}px`,
+                          height: `${Math.max(6, Math.round(piece.size * 0.7))}px`,
+                          backgroundColor: piece.color,
+                          borderRadius: piece.borderRadius,
+                          animationDelay: `${piece.delay}ms`,
+                          animationDuration: `${piece.duration}ms`
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div />
@@ -526,12 +636,31 @@ export default function Room({ routeRoomId }: RoomProps) {
 
             <div className="order-3 sm:order-3">
               {thirdPlace ? (
-                <div className="rounded-lg border-2 border-[#cd7f32] bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
-                  <p className="font-['Bebas_Neue'] text-6xl leading-none text-[#cd7f32]">3rd</p>
-                  <p className="mt-2 text-3xl font-black" style={{ color: getChatColorForName(thirdPlace.name) }}>
-                    {thirdPlace.name}
-                  </p>
-                  <p className="text-xl font-semibold text-zinc-700">{thirdPlace.score} pts</p>
+                <div className="podium-card group relative overflow-visible rounded-lg border-2 border-[#cd7f32] bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                  <div className="podium-card-inner">
+                    <p className="font-['Bebas_Neue'] text-6xl leading-none text-[#cd7f32]">3rd</p>
+                    <p className="mt-2 text-3xl font-black" style={{ color: getChatColorForName(thirdPlace.name) }}>
+                      {thirdPlace.name}
+                    </p>
+                    <p className="text-xl font-semibold text-zinc-700">{thirdPlace.score} pts</p>
+                  </div>
+                  <div className="podium-confetti" aria-hidden="true">
+                    {thirdPlaceConfetti.map((piece, index) => (
+                      <span
+                        key={`podium-3-${index}`}
+                        className={`confetti-piece confetti-${piece.variant}`}
+                        style={{
+                          left: `${piece.left}%`,
+                          width: `${piece.size}px`,
+                          height: `${Math.max(4, Math.round(piece.size * 0.7))}px`,
+                          backgroundColor: piece.color,
+                          borderRadius: piece.borderRadius,
+                          animationDelay: `${piece.delay}ms`,
+                          animationDuration: `${piece.duration}ms`
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div />

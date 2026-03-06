@@ -6,3 +6,73 @@ body {
   margin: 0;
   font-family: "Barlow Condensed", "Segoe UI", sans-serif;
 }
+
+.podium-card {
+  transform: translateY(0);
+  transition: transform 180ms ease, box-shadow 220ms ease;
+}
+
+.podium-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 26px 42px rgba(0, 0, 0, 0.28);
+}
+
+.podium-card-inner {
+  transform-origin: 50% 100%;
+}
+
+.podium-card:hover .podium-card-inner {
+  animation: podium-wobble 420ms ease-out;
+}
+
+.podium-confetti {
+  pointer-events: none;
+  position: absolute;
+  inset: -18px 0 0 0;
+  overflow: visible;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: 56%;
+  opacity: 0;
+  transform: translateY(0) rotate(0deg);
+}
+
+.podium-card:hover .confetti-piece.confetti-left {
+  animation: confetti-left 760ms ease-out both;
+}
+
+.podium-card:hover .confetti-piece.confetti-center {
+  animation: confetti-center 760ms ease-out both;
+}
+
+.podium-card:hover .confetti-piece.confetti-right {
+  animation: confetti-right 760ms ease-out both;
+}
+
+@keyframes podium-wobble {
+  0% { transform: translateY(0) rotate(0deg); }
+  24% { transform: translateY(-2px) rotate(-1.7deg); }
+  50% { transform: translateY(1px) rotate(1.25deg); }
+  74% { transform: translateY(-1px) rotate(-0.65deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+
+@keyframes confetti-left {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.8); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(-28px, -78px) rotate(-160deg) scale(1); }
+}
+
+@keyframes confetti-center {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.8); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(0, -86px) rotate(170deg) scale(1); }
+}
+
+@keyframes confetti-right {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.8); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(28px, -78px) rotate(160deg) scale(1); }
+}
