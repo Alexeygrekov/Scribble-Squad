@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { leaveLobby, startGame } from "../store";
 import { useRoomSocket } from "../useRoomSocket";
+import { playButtonClick, playHoverSnap } from "../sounds";
 
 const SESSION_KEY = "scribble_squad_tab_session";
 const ROOM_NOT_FOUND_ERROR = "Room not found.";
@@ -70,6 +71,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
   }, [dispatch, error]);
 
   async function handleCopyRoomLink() {
+    playButtonClick();
     try {
       if (!displayRoomId) {
         throw new Error("No room ID");
@@ -83,6 +85,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
   }
 
   function handleGoHome() {
+    playButtonClick();
     try {
       window.sessionStorage.removeItem(SESSION_KEY);
       window.history.replaceState(null, "", "/");
@@ -97,6 +100,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
     if (!canStart) {
       return;
     }
+    playButtonClick();
     void dispatch(startGame({ roomId: displayRoomId, username }));
   }
 
@@ -107,6 +111,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
           type="button"
           className="inline-flex h-10 min-w-[74px] items-center justify-center rounded-md bg-orange-500 px-4 text-sm font-bold tracking-wide text-white transition hover:-translate-y-0.5 hover:bg-orange-600 hover:ring-2 hover:ring-sky-300"
           onClick={handleGoHome}
+          onMouseEnter={playHoverSnap}
         >
           Home
         </button>
@@ -122,6 +127,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
             type="button"
             className="rounded bg-white/20 px-3 py-1.5 text-sm font-bold tracking-wide text-white transition hover:bg-white/30"
             onClick={handleCopyRoomLink}
+            onMouseEnter={playHoverSnap}
           >
             {copyState === "copied" ? "Copied" : "Copy Link"}
           </button>
@@ -160,6 +166,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
           className="mt-5 w-full rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition duration-150 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-65"
           disabled={!canStart}
           onClick={handleStartGame}
+          onMouseEnter={playHoverSnap}
         >
           {isHost ? (status === "loading" ? "Starting..." : "Start Game") : "Waiting For Host..."}
         </button>

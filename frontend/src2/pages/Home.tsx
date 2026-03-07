@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { clearError, createGame, joinGame, setError } from "../store";
 import paintPaletteImage from "../assets/ui/paint_palette2.png";
+import { playButtonClick, playHoverSnap } from "../sounds";
 
 const inputClassName =
   "w-full border border-zinc-700 bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-900 outline-none placeholder:text-slate-400 focus:border-zinc-900";
@@ -30,6 +31,7 @@ export default function Home({ initialJoinRoomId = "" }: HomeProps) {
 
   function handleJoinSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    playButtonClick();
     const trimmedRoomId = joinRoomId.trim().toUpperCase();
     const trimmedUsername = joinUsername.trim();
 
@@ -44,6 +46,7 @@ export default function Home({ initialJoinRoomId = "" }: HomeProps) {
 
   function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    playButtonClick();
     const trimmedUsername = createUsername.trim();
 
     if (!trimmedUsername) {
@@ -95,7 +98,7 @@ export default function Home({ initialJoinRoomId = "" }: HomeProps) {
                 onChange={(event) => setJoinUsername(event.target.value)}
                 autoComplete="off"
               />
-              <button className={buttonClassName} type="submit" disabled={isLoading}>
+              <button className={buttonClassName} type="submit" disabled={isLoading} onMouseEnter={playHoverSnap}>
                 {isLoading ? "Joining..." : "Join Game"}
               </button>
             </form>
@@ -113,7 +116,7 @@ export default function Home({ initialJoinRoomId = "" }: HomeProps) {
                 onChange={(event) => setCreateUsername(event.target.value)}
                 autoComplete="off"
               />
-              <button className={buttonClassName} type="submit" disabled={isLoading}>
+              <button className={buttonClassName} type="submit" disabled={isLoading} onMouseEnter={playHoverSnap}>
                 {isLoading ? "Creating..." : "Create Game"}
               </button>
             </form>

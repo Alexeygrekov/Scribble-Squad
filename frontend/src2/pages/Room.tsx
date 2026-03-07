@@ -8,6 +8,7 @@ import paintBucketIcon from "../assets/tools/paint_bucket2.png";
 import undoIcon from "../assets/tools/undo2.png";
 import trashBinIcon from "../assets/tools/trash_bin.png";
 import alarmClockIcon from "../assets/ui/alarm_clock.png";
+import { playButtonClick, playHoverSnap, playRoundStart, playRoundEnd, playClockTick, playCorrectGuess, playGameOver, playConfettiCannon } from "../sounds";
 
 const SESSION_KEY = "scribble_squad_tab_session";
 const ROOM_NOT_FOUND_ERROR = "Room not found.";
@@ -99,73 +100,78 @@ function getTimerProgressColor(progressRatio: number) {
   return `hsl(${hue} 78% 44%)`;
 }
 
-function createPodiumConfettiPieces(rank: 1 | 2 | 3) {
-  const count = rank === 1 ? 28 : rank === 2 ? 18 : 12;
-  const maxSpread = rank === 1 ? 42 : rank === 2 ? 34 : 26;
-  const minSpread = rank === 1 ? 8 : rank === 2 ? 7 : 6;
-  const centerSize = rank === 1 ? 11 : rank === 2 ? 9 : 8;
-  const edgeSize = rank === 1 ? 7 : rank === 2 ? 6 : 5;
-  const duration = rank === 1 ? 860 : rank === 2 ? 720 : 600;
-  const delay = 120;
-  const colorScale = rank === 1
-    ? ["#fde047", "#f59e0b", "#ef4444", "#22c55e", "#3b82f6", "#a855f7"]
+function createPodiumBurst(rank: 1 | 2 | 3) {
+  const count = rank === 1 ? 50 : rank === 2 ? 30 : 16;
+  const maxRadius = rank === 1 ? 180 : rank === 2 ? 120 : 70;
+  const minSize = rank === 1 ? 7 : rank === 2 ? 5 : 4;
+  const maxSize = rank === 1 ? 14 : rank === 2 ? 11 : 8;
+  const duration = rank === 1 ? 2200 : rank === 2 ? 1600 : 1100;
+  const baseDelay = rank === 1 ? 400 : rank === 2 ? 700 : 1000;
+  const staggerRange = rank === 1 ? 500 : rank === 2 ? 350 : 200;
+  const colors = rank === 1
+    ? ["#fde047", "#f59e0b", "#ef4444", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316"]
     : rank === 2
-      ? ["#facc15", "#f59e0b", "#ef4444", "#22c55e", "#3b82f6"]
-      : ["#f59e0b", "#ef4444", "#22c55e", "#3b82f6"];
-  const pairCount = Math.floor((count - 2) / 2);
+      ? ["#c0c0c0", "#e2e8f0", "#94a3b8", "#3b82f6", "#a855f7"]
+      : ["#cd7f32", "#f59e0b", "#ef4444", "#22c55e"];
+
+  const pieces: Array<{
+    size: number;
+    color: string;
+    borderRadius: string;
+    delay: number;
+    duration: number;
+    x: number;
+    y: number;
+    rotation: number;
+  }> = [];
+
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.6;
+    const radius = maxRadius * (0.4 + Math.random() * 0.6);
+    pieces.push({
+      size: minSize + Math.random() * (maxSize - minSize),
+      color: colors[Math.floor(Math.random() * colors.length)],
+      borderRadius: Math.random() > 0.5 ? "9999px" : `${2 + Math.random() * 3}px`,
+      delay: baseDelay + Math.random() * staggerRange,
+      duration: duration * (0.7 + Math.random() * 0.3),
+      x: Math.round(Math.cos(angle) * radius),
+      y: Math.round(Math.sin(angle) * radius * 0.7 - radius * 0.3),
+      rotation: (Math.random() - 0.5) * 720
+    });
+  }
+  return pieces;
+}
+
+function createCannonPieces() {
+  const colors = ["#fde047", "#f59e0b", "#ef4444", "#22c55e", "#3b82f6", "#a855f7", "#ec4899", "#14b8a6", "#f97316"];
   const pieces: Array<{
     left: number;
     size: number;
-    variant: "left" | "center" | "right";
-    delay: number;
-    duration: number;
     color: string;
     borderRadius: string;
+    delay: number;
+    duration: number;
+    x: number;
+    y: number;
+    rotation: number;
   }> = [];
 
-  for (let centerIndex = 0; centerIndex < 2; centerIndex += 1) {
+  for (let i = 0; i < 60; i += 1) {
+    const fromLeft = Math.random() < 0.5;
+    const startLeft = fromLeft ? -2 + Math.random() * 15 : 85 + Math.random() * 17;
     pieces.push({
-      left: centerIndex === 0 ? 48.8 : 51.2,
-      size: centerSize,
-      variant: "center",
-      delay,
-      duration,
-      color: colorScale[0],
-      borderRadius: centerIndex === 0 ? "9999px" : "2px"
+      left: startLeft,
+      size: 6 + Math.random() * 10,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      borderRadius: Math.random() > 0.5 ? "9999px" : `${2 + Math.random() * 4}px`,
+      delay: Math.random() * 600,
+      duration: 1800 + Math.random() * 1200,
+      x: (fromLeft ? 1 : -1) * (30 + Math.random() * 120),
+      y: -(300 + Math.random() * 500),
+      rotation: (Math.random() - 0.5) * 720
     });
   }
-
-  for (let pairIndex = 0; pairIndex < pairCount; pairIndex += 1) {
-    const pairRatio = pairCount > 1 ? pairIndex / (pairCount - 1) : 1;
-    const spread = minSpread + pairRatio * (maxSpread - minSpread);
-    const leftPos = Math.max(8, 50 - spread);
-    const rightPos = Math.min(92, 50 + spread);
-    const size = Math.max(edgeSize, Math.round(centerSize - pairRatio * (centerSize - edgeSize)));
-    const colorIndex = Math.min(colorScale.length - 1, Math.floor(pairRatio * (colorScale.length - 1)));
-    const color = colorScale[colorIndex];
-    const borderRadius = pairIndex % 2 === 0 ? "9999px" : "2px";
-
-    pieces.push({
-      left: leftPos,
-      size,
-      variant: "left",
-      delay,
-      duration,
-      color,
-      borderRadius
-    });
-    pieces.push({
-      left: rightPos,
-      size,
-      variant: "right",
-      delay,
-      duration,
-      color,
-      borderRadius
-    });
-  }
-
-  return pieces.slice(0, count);
+  return pieces;
 }
 
 function renderSystemMessageText(messageText: string) {
@@ -366,6 +372,9 @@ export default function Room({ routeRoomId }: RoomProps) {
       return;
     }
 
+    playGameOver();
+    setTimeout(() => playConfettiCannon(), 400);
+
     setShowGameOverTransition(true);
     const timerId = window.setTimeout(() => {
       setShowGameOverTransition(false);
@@ -375,6 +384,42 @@ export default function Room({ routeRoomId }: RoomProps) {
       window.clearTimeout(timerId);
     };
   }, [isGameOver]);
+
+  // Sound: round start (entering playing phase)
+  const prevPhaseRef = useRef(phase);
+  useEffect(() => {
+    const prevPhase = prevPhaseRef.current;
+    prevPhaseRef.current = phase;
+
+    if (phase === "playing" && prevPhase === "choosing_word") {
+      playRoundStart();
+    }
+    if ((phase === "choosing_word" || phase === "game_over") && prevPhase === "playing") {
+      playRoundEnd();
+    }
+  }, [phase]);
+
+  // Sound: clock tick when time is low (last 10 seconds)
+  const prevTimerRef = useRef(timerSecondsLeft);
+  useEffect(() => {
+    const prev = prevTimerRef.current;
+    prevTimerRef.current = timerSecondsLeft;
+    if (phase === "playing" && timerSecondsLeft <= 10 && timerSecondsLeft > 0 && timerSecondsLeft < prev) {
+      playClockTick();
+    }
+  }, [phase, timerSecondsLeft]);
+
+  // Sound: correct guess (new success message)
+  const prevMsgCountRef = useRef(messages.length);
+  useEffect(() => {
+    if (messages.length > prevMsgCountRef.current) {
+      const newMessages = messages.slice(prevMsgCountRef.current);
+      if (newMessages.some((m) => m.type === "success")) {
+        playCorrectGuess();
+      }
+    }
+    prevMsgCountRef.current = messages.length;
+  }, [messages]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -535,6 +580,7 @@ export default function Room({ routeRoomId }: RoomProps) {
   }
 
   function handleGoHome() {
+    playButtonClick();
     try {
       window.sessionStorage.removeItem(SESSION_KEY);
       window.history.replaceState(null, "", "/");
@@ -557,12 +603,34 @@ export default function Room({ routeRoomId }: RoomProps) {
     const firstPlace = rankedPlayers[0] || null;
     const secondPlace = rankedPlayers[1] || null;
     const thirdPlace = rankedPlayers[2] || null;
-    const firstPlaceConfetti = createPodiumConfettiPieces(1);
-    const secondPlaceConfetti = createPodiumConfettiPieces(2);
-    const thirdPlaceConfetti = createPodiumConfettiPieces(3);
+    const firstPlaceBurst = createPodiumBurst(1);
+    const secondPlaceBurst = createPodiumBurst(2);
+    const thirdPlaceBurst = createPodiumBurst(3);
+    const cannonPieces = createCannonPieces();
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 py-6 sm:px-8 sm:py-8">
+        <div className="cannon-confetti-container" aria-hidden="true">
+          {cannonPieces.map((piece, index) => (
+            <span
+              key={`cannon-${index}`}
+              className="cannon-piece"
+              style={{
+                left: `${piece.left}%`,
+                width: `${piece.size}px`,
+                height: `${Math.max(4, Math.round(piece.size * 0.65))}px`,
+                backgroundColor: piece.color,
+                borderRadius: piece.borderRadius,
+                ["--cannon-delay" as string]: `${piece.delay}ms`,
+                ["--cannon-duration" as string]: `${piece.duration}ms`,
+                ["--cannon-x" as string]: `${piece.x}px`,
+                ["--cannon-y" as string]: `${piece.y}px`,
+                ["--cannon-rot" as string]: `${piece.rotation}deg`,
+              }}
+            />
+          ))}
+        </div>
+
         <main className="mx-auto mt-8 w-full max-w-5xl">
           <h1 className="text-center font-['Bebas_Neue'] text-7xl tracking-wider text-white">Game Over</h1>
           <p className="mt-2 text-center text-2xl font-semibold text-white/95">Final Standings</p>
@@ -570,30 +638,32 @@ export default function Room({ routeRoomId }: RoomProps) {
           <section className="mx-auto mt-8 grid max-w-4xl items-end gap-4 sm:grid-cols-3">
             <div className="order-1 sm:order-1">
               {secondPlace ? (
-                <div className="podium-card group relative overflow-visible rounded-lg border-2 border-zinc-400 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                <div className="podium-card podium-enter podium-enter-2nd group relative overflow-visible rounded-lg border-2 border-zinc-400 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                  <div className="podium-burst-container" aria-hidden="true">
+                    {secondPlaceBurst.map((piece, index) => (
+                      <span
+                        key={`burst-2-${index}`}
+                        className="podium-burst-piece"
+                        style={{
+                          width: `${piece.size}px`,
+                          height: `${Math.max(4, Math.round(piece.size * 0.65))}px`,
+                          backgroundColor: piece.color,
+                          borderRadius: piece.borderRadius,
+                          ["--burst-delay" as string]: `${piece.delay}ms`,
+                          ["--burst-duration" as string]: `${piece.duration}ms`,
+                          ["--burst-x" as string]: `${piece.x}px`,
+                          ["--burst-y" as string]: `${piece.y}px`,
+                          ["--burst-rot" as string]: `${piece.rotation}deg`,
+                        }}
+                      />
+                    ))}
+                  </div>
                   <div className="podium-card-inner">
                     <p className="font-['Bebas_Neue'] text-6xl leading-none text-zinc-600">2nd</p>
                     <p className="mt-2 text-3xl font-black" style={{ color: getChatColorForName(secondPlace.name) }}>
                       {secondPlace.name}
                     </p>
                     <p className="text-xl font-semibold text-zinc-700">{secondPlace.score} pts</p>
-                  </div>
-                  <div className="podium-confetti" aria-hidden="true">
-                    {secondPlaceConfetti.map((piece, index) => (
-                      <span
-                        key={`podium-2-${index}`}
-                        className={`confetti-piece confetti-${piece.variant}`}
-                        style={{
-                          left: `${piece.left}%`,
-                          width: `${piece.size}px`,
-                          height: `${Math.max(5, Math.round(piece.size * 0.7))}px`,
-                          backgroundColor: piece.color,
-                          borderRadius: piece.borderRadius,
-                          animationDelay: `${piece.delay}ms`,
-                          animationDuration: `${piece.duration}ms`
-                        }}
-                      />
-                    ))}
                   </div>
                 </div>
               ) : (
@@ -603,30 +673,32 @@ export default function Room({ routeRoomId }: RoomProps) {
 
             <div className="order-2 sm:order-2">
               {firstPlace ? (
-                <div className="podium-card group relative overflow-visible rounded-lg border-2 border-amber-300 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                <div className="podium-card podium-enter podium-enter-1st group relative overflow-visible rounded-lg border-2 border-amber-300 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                  <div className="podium-burst-container" aria-hidden="true">
+                    {firstPlaceBurst.map((piece, index) => (
+                      <span
+                        key={`burst-1-${index}`}
+                        className="podium-burst-piece"
+                        style={{
+                          width: `${piece.size}px`,
+                          height: `${Math.max(5, Math.round(piece.size * 0.65))}px`,
+                          backgroundColor: piece.color,
+                          borderRadius: piece.borderRadius,
+                          ["--burst-delay" as string]: `${piece.delay}ms`,
+                          ["--burst-duration" as string]: `${piece.duration}ms`,
+                          ["--burst-x" as string]: `${piece.x}px`,
+                          ["--burst-y" as string]: `${piece.y}px`,
+                          ["--burst-rot" as string]: `${piece.rotation}deg`,
+                        }}
+                      />
+                    ))}
+                  </div>
                   <div className="podium-card-inner">
                     <p className="font-['Bebas_Neue'] text-6xl leading-none text-amber-500">1st</p>
                     <p className="mt-2 text-4xl font-black" style={{ color: getChatColorForName(firstPlace.name) }}>
                       {firstPlace.name}
                     </p>
                     <p className="text-2xl font-semibold text-zinc-700">{firstPlace.score} pts</p>
-                  </div>
-                  <div className="podium-confetti" aria-hidden="true">
-                    {firstPlaceConfetti.map((piece, index) => (
-                      <span
-                        key={`podium-1-${index}`}
-                        className={`confetti-piece confetti-${piece.variant}`}
-                        style={{
-                          left: `${piece.left}%`,
-                          width: `${piece.size}px`,
-                          height: `${Math.max(6, Math.round(piece.size * 0.7))}px`,
-                          backgroundColor: piece.color,
-                          borderRadius: piece.borderRadius,
-                          animationDelay: `${piece.delay}ms`,
-                          animationDuration: `${piece.duration}ms`
-                        }}
-                      />
-                    ))}
                   </div>
                 </div>
               ) : (
@@ -636,30 +708,32 @@ export default function Room({ routeRoomId }: RoomProps) {
 
             <div className="order-3 sm:order-3">
               {thirdPlace ? (
-                <div className="podium-card group relative overflow-visible rounded-lg border-2 border-[#cd7f32] bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                <div className="podium-card podium-enter podium-enter-3rd group relative overflow-visible rounded-lg border-2 border-[#cd7f32] bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                  <div className="podium-burst-container" aria-hidden="true">
+                    {thirdPlaceBurst.map((piece, index) => (
+                      <span
+                        key={`burst-3-${index}`}
+                        className="podium-burst-piece"
+                        style={{
+                          width: `${piece.size}px`,
+                          height: `${Math.max(3, Math.round(piece.size * 0.65))}px`,
+                          backgroundColor: piece.color,
+                          borderRadius: piece.borderRadius,
+                          ["--burst-delay" as string]: `${piece.delay}ms`,
+                          ["--burst-duration" as string]: `${piece.duration}ms`,
+                          ["--burst-x" as string]: `${piece.x}px`,
+                          ["--burst-y" as string]: `${piece.y}px`,
+                          ["--burst-rot" as string]: `${piece.rotation}deg`,
+                        }}
+                      />
+                    ))}
+                  </div>
                   <div className="podium-card-inner">
                     <p className="font-['Bebas_Neue'] text-6xl leading-none text-[#cd7f32]">3rd</p>
                     <p className="mt-2 text-3xl font-black" style={{ color: getChatColorForName(thirdPlace.name) }}>
                       {thirdPlace.name}
                     </p>
                     <p className="text-xl font-semibold text-zinc-700">{thirdPlace.score} pts</p>
-                  </div>
-                  <div className="podium-confetti" aria-hidden="true">
-                    {thirdPlaceConfetti.map((piece, index) => (
-                      <span
-                        key={`podium-3-${index}`}
-                        className={`confetti-piece confetti-${piece.variant}`}
-                        style={{
-                          left: `${piece.left}%`,
-                          width: `${piece.size}px`,
-                          height: `${Math.max(4, Math.round(piece.size * 0.7))}px`,
-                          backgroundColor: piece.color,
-                          borderRadius: piece.borderRadius,
-                          animationDelay: `${piece.delay}ms`,
-                          animationDuration: `${piece.duration}ms`
-                        }}
-                      />
-                    ))}
                   </div>
                 </div>
               ) : (
@@ -689,6 +763,7 @@ export default function Room({ routeRoomId }: RoomProps) {
             type="button"
             className="mx-auto mt-6 block w-full max-w-3xl rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition duration-150 hover:-translate-y-0.5 hover:scale-[1.01] hover:bg-[#ff4c3a] hover:ring-2 hover:ring-sky-400"
             onClick={handleGoHome}
+            onMouseEnter={playHoverSnap}
           >
             Play Again
           </button>
@@ -707,6 +782,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                 type="button"
                 className="inline-flex h-10 min-w-[74px] items-center justify-center rounded-md bg-[#ff5a4a] px-4 text-sm font-bold tracking-wide text-white transition hover:-translate-y-0.5 hover:bg-[#ff4c3a] hover:ring-2 hover:ring-sky-300"
                 onClick={handleGoHome}
+                onMouseEnter={playHoverSnap}
               >
                 Home
               </button>
@@ -1030,6 +1106,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                   className="w-full rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-3 text-center font-['Bebas_Neue'] text-4xl leading-none tracking-wide text-white transition duration-150 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-70"
                   onClick={() => handleChooseWord(choice)}
                   disabled={isChoosingWordSubmitting}
+                  onMouseEnter={playHoverSnap}
                 >
                   {choice.toUpperCase()}
                 </button>

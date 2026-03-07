@@ -7,6 +7,7 @@ body {
   font-family: "Barlow Condensed", "Segoe UI", sans-serif;
 }
 
+/* --- Podium cards --- */
 .podium-card {
   transform: translateY(0);
   transition: transform 180ms ease, box-shadow 220ms ease;
@@ -25,30 +26,19 @@ body {
   animation: podium-wobble 420ms ease-out;
 }
 
-.podium-confetti {
-  pointer-events: none;
-  position: absolute;
-  inset: -18px 0 0 0;
-  overflow: visible;
-}
-
-.confetti-piece {
-  position: absolute;
-  top: 56%;
+/* --- Podium entrance --- */
+.podium-card.podium-enter {
   opacity: 0;
-  transform: translateY(0) rotate(0deg);
+  transform: translateY(40px) scale(0.85);
+  animation: podium-slide-in 600ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
+.podium-card.podium-enter-1st { animation-delay: 200ms; }
+.podium-card.podium-enter-2nd { animation-delay: 500ms; }
+.podium-card.podium-enter-3rd { animation-delay: 800ms; }
 
-.podium-card:hover .confetti-piece.confetti-left {
-  animation: confetti-left 760ms ease-out both;
-}
-
-.podium-card:hover .confetti-piece.confetti-center {
-  animation: confetti-center 760ms ease-out both;
-}
-
-.podium-card:hover .confetti-piece.confetti-right {
-  animation: confetti-right 760ms ease-out both;
+@keyframes podium-slide-in {
+  0% { opacity: 0; transform: translateY(40px) scale(0.85); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes podium-wobble {
@@ -59,20 +49,51 @@ body {
   100% { transform: translateY(0) rotate(0deg); }
 }
 
-@keyframes confetti-left {
-  0% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.8); }
-  15% { opacity: 1; }
-  100% { opacity: 0; transform: translate(-28px, -78px) rotate(-160deg) scale(1); }
+/* --- Per-card confetti burst (cannon style behind each podium card) --- */
+.podium-burst-container {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  z-index: -1;
 }
 
-@keyframes confetti-center {
-  0% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.8); }
-  15% { opacity: 1; }
-  100% { opacity: 0; transform: translate(0, -86px) rotate(170deg) scale(1); }
+.podium-burst-piece {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  opacity: 0;
+  animation: podium-burst var(--burst-duration, 1.6s) cubic-bezier(0.15, 0.85, 0.3, 1) forwards;
+  animation-delay: var(--burst-delay, 0ms);
 }
 
-@keyframes confetti-right {
-  0% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.8); }
-  15% { opacity: 1; }
-  100% { opacity: 0; transform: translate(28px, -78px) rotate(160deg) scale(1); }
+@keyframes podium-burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(0deg) scale(0.2); }
+  10% { opacity: 1; transform: translate(-50%, -50%) rotate(0deg) scale(0.6); }
+  50% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--burst-x, 0px)), calc(-50% + var(--burst-y, -120px))) rotate(var(--burst-rot, 360deg)) scale(1); }
+}
+
+/* --- Full-screen confetti cannon --- */
+.cannon-confetti-container {
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 50;
+}
+
+.cannon-piece {
+  position: absolute;
+  bottom: -20px;
+  opacity: 0;
+  animation: cannon-burst var(--cannon-duration, 2.2s) cubic-bezier(0.15, 0.8, 0.3, 1) forwards;
+  animation-delay: var(--cannon-delay, 0ms);
+}
+
+@keyframes cannon-burst {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.3); }
+  8% { opacity: 1; }
+  55% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--cannon-x, 0px), var(--cannon-y, -600px)) rotate(var(--cannon-rot, 360deg)) scale(1); }
 }
