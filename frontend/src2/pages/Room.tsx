@@ -410,16 +410,17 @@ export default function Room({ routeRoomId }: RoomProps) {
   }, [phase, timerSecondsLeft]);
 
   // Sound: correct guess (new success message)
+  // Skip if phase is no longer "playing" (last guesser triggers round end instead)
   const prevMsgCountRef = useRef(messages.length);
   useEffect(() => {
     if (messages.length > prevMsgCountRef.current) {
       const newMessages = messages.slice(prevMsgCountRef.current);
-      if (newMessages.some((m) => m.type === "success")) {
+      if (phase === "playing" && newMessages.some((m) => m.type === "success")) {
         playCorrectGuess();
       }
     }
     prevMsgCountRef.current = messages.length;
-  }, [messages]);
+  }, [messages, phase]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -761,7 +762,7 @@ export default function Room({ routeRoomId }: RoomProps) {
 
           <button
             type="button"
-            className="mx-auto mt-6 block w-full max-w-3xl rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition duration-150 hover:-translate-y-0.5 hover:scale-[1.01] hover:bg-[#ff4c3a] hover:ring-2 hover:ring-sky-400"
+            className="mx-auto mt-6 block w-full max-w-3xl rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition-[background-color,box-shadow] duration-100 hover:-translate-y-0.5 hover:scale-[1.01] hover:bg-[#ff4c3a] hover:ring-2 hover:ring-sky-400"
             onClick={handleGoHome}
             onMouseEnter={playHoverSnap}
           >
@@ -1103,7 +1104,7 @@ export default function Room({ routeRoomId }: RoomProps) {
                 <button
                   key={choice}
                   type="button"
-                  className="w-full rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-3 text-center font-['Bebas_Neue'] text-4xl leading-none tracking-wide text-white transition duration-150 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="w-full rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-3 text-center font-['Bebas_Neue'] text-4xl leading-none tracking-wide text-white transition-[background-color,box-shadow] duration-100 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-70"
                   onClick={() => handleChooseWord(choice)}
                   disabled={isChoosingWordSubmitting}
                   onMouseEnter={playHoverSnap}

@@ -2,12 +2,12 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useAppDispatch, useAppSelector } from "../hooks";
 import { clearError, createGame, joinGame, setError } from "../store";
 import paintPaletteImage from "../assets/ui/paint_palette2.png";
-import { playButtonClick, playHoverSnap } from "../sounds";
+import { playButtonClick, playHoverSnap, unlockAudio } from "../sounds";
 
 const inputClassName =
   "w-full border border-zinc-700 bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-900 outline-none placeholder:text-slate-400 focus:border-zinc-900";
 const buttonClassName =
-  "w-full rounded-md border border-white/25 bg-[#ff5a4a] px-3 py-2 text-center font-['Bebas_Neue'] text-2xl tracking-wide text-white transition duration-150 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full rounded-md border border-white/25 bg-[#ff5a4a] px-3 py-2 text-center font-['Bebas_Neue'] text-2xl tracking-wide text-white transition-[background-color,box-shadow] duration-100 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-60";
 
 type HomeProps = {
   initialJoinRoomId?: string;
@@ -89,6 +89,7 @@ export default function Home({ initialJoinRoomId = "" }: HomeProps) {
                 placeholder="Game ID"
                 value={joinRoomId}
                 onChange={(event) => setJoinRoomId(event.target.value.toUpperCase())}
+                onKeyDown={unlockAudio}
                 autoComplete="off"
               />
               <input
@@ -96,6 +97,7 @@ export default function Home({ initialJoinRoomId = "" }: HomeProps) {
                 placeholder="Username"
                 value={joinUsername}
                 onChange={(event) => setJoinUsername(event.target.value)}
+                onKeyDown={unlockAudio}
                 autoComplete="off"
               />
               <button className={buttonClassName} type="submit" disabled={isLoading} onMouseEnter={playHoverSnap}>
@@ -114,6 +116,7 @@ export default function Home({ initialJoinRoomId = "" }: HomeProps) {
                 placeholder="Username"
                 value={createUsername}
                 onChange={(event) => setCreateUsername(event.target.value)}
+                onKeyDown={unlockAudio}
                 autoComplete="off"
               />
               <button className={buttonClassName} type="submit" disabled={isLoading} onMouseEnter={playHoverSnap}>

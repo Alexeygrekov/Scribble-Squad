@@ -163,7 +163,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
 
         <button
           type="button"
-          className="mt-5 w-full rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition duration-150 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-65"
+          className="mt-5 w-full rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition-[background-color,box-shadow] duration-100 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-65"
           disabled={!canStart}
           onClick={handleStartGame}
           onMouseEnter={playHoverSnap}

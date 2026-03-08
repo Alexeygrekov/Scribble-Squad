@@ -2,6 +2,7 @@
 // Inspired by skribbl.io / Super Battle Golf style UI sounds
 
 let audioCtx: AudioContext | null = null;
+let audioUnlocked = false;
 
 function getAudioContext(): AudioContext {
   if (!audioCtx) {
@@ -11,6 +12,26 @@ function getAudioContext(): AudioContext {
     void audioCtx.resume();
   }
   return audioCtx;
+}
+
+// Returns true only if the AudioContext is running (user has interacted).
+// Prevents sounds from queueing while suspended and all playing at once.
+function isAudioReady(): boolean {
+  if (audioUnlocked) return true;
+  if (!audioCtx) return false;
+  if (audioCtx.state === "running") {
+    audioUnlocked = true;
+    return true;
+  }
+  return false;
+}
+
+// Call this on any user interaction to warm up the AudioContext early
+export function unlockAudio() {
+  const ctx = getAudioContext();
+  if (ctx.state === "running") {
+    audioUnlocked = true;
+  }
 }
 
 function playTone(
@@ -57,7 +78,9 @@ function playNoise(duration: number, volume = 0.08) {
 }
 
 // --- Hover snap: very short crisp tick on button hover ---
+// Silently skips if audio hasn't been unlocked yet (prevents queueing)
 export function playHoverSnap() {
+  if (!isAudioReady()) return;
   const ctx = getAudioContext();
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -73,8 +96,10 @@ export function playHoverSnap() {
 }
 
 // --- Button click: short bright pop ---
+// Also unlocks audio since clicks are real user interactions
 export function playButtonClick() {
   const ctx = getAudioContext();
+  audioUnlocked = true;
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.type = "sine";
@@ -89,7 +114,7 @@ export function playButtonClick() {
   osc.stop(ctx.currentTime + 0.1);
 }
 
-// --- Round start: ascending arpeggio ---
+// --- Round start: ascending arpeggio C5 -> E5 -> G5 -> C6 ---
 export function playRoundStart() {
   const notes = [523, 659, 784, 1047]; // C5, E5, G5, C6
   notes.forEach((freq, i) => {
@@ -97,20 +122,12 @@ export function playRoundStart() {
   });
 }
 
-// --- Round end: descending tone ---
+// --- Round end: descending arpeggio C6 -> G5 -> E5 -> C5 (reverse of start) ---
 export function playRoundEnd() {
-  const ctx = getAudioContext();
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = "triangle";
-  osc.frequency.setValueAtTime(784, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(330, ctx.currentTime + 0.4);
-  gain.gain.setValueAtTime(0.14, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(ctx.currentTime);
-  osc.stop(ctx.currentTime + 0.5);
+  const notes = [1047, 784, 659, 523]; // C6, G5, E5, C5
+  notes.forEach((freq, i) => {
+    setTimeout(() => playTone(freq, 0.2, "triangle", 0.13), i * 80);
+  });
 }
 
 // --- Clock tick: subtle click at low time ---
