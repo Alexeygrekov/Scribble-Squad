@@ -34,6 +34,27 @@ export function unlockAudio() {
   }
 }
 
+// Auto-unlock on the very first user interaction anywhere on the page.
+// This ensures audio works even if the user clicks a button before typing.
+function setupGlobalUnlock() {
+  function onFirstInteraction() {
+    const ctx = getAudioContext();
+    // resume() returns a promise; once resolved, mark unlocked
+    void ctx.resume().then(() => {
+      audioUnlocked = true;
+    });
+    document.removeEventListener("pointerdown", onFirstInteraction, true);
+    document.removeEventListener("keydown", onFirstInteraction, true);
+  }
+  document.addEventListener("pointerdown", onFirstInteraction, true);
+  document.addEventListener("keydown", onFirstInteraction, true);
+}
+
+// Run once when this module loads
+if (typeof document !== "undefined") {
+  setupGlobalUnlock();
+}
+
 function playTone(
   frequency: number,
   duration: number,
@@ -96,22 +117,36 @@ export function playHoverSnap() {
 }
 
 // --- Button click: short bright pop ---
-// Also unlocks audio since clicks are real user interactions
+// Also unlocks audio since clicks are real user interactions.
+// If context is still resuming (first ever click), retry after resume completes.
 export function playButtonClick() {
   const ctx = getAudioContext();
   audioUnlocked = true;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.type = "sine";
-  osc.frequency.setValueAtTime(880, ctx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.03);
-  osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.08);
-  gain.gain.setValueAtTime(0.12, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  osc.start(ctx.currentTime);
-  osc.stop(ctx.currentTime + 0.1);
+
+  function emit() {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.03);
+    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.1);
+  }
+
+  if (ctx.state === "running") {
+    emit();
+  } else {
+    // Context is still resuming from first interaction — play once it's ready
+    void ctx.resume().then(() => {
+      audioUnlocked = true;
+      emit();
+    });
+  }
 }
 
 // --- Round start: ascending arpeggio C5 -> E5 -> G5 -> C6 ---

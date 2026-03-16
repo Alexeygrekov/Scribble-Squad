@@ -242,6 +242,7 @@ export default function Room({ routeRoomId }: RoomProps) {
   const [showGameOverTransition, setShowGameOverTransition] = useState(false);
 
   const drawingPointsRef = useRef<StrokePoint[]>([]);
+  const pendingStrokeRef = useRef(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chatListRef = useRef<HTMLDivElement | null>(null);
 
@@ -394,7 +395,7 @@ export default function Room({ routeRoomId }: RoomProps) {
     if (phase === "playing" && prevPhase === "choosing_word") {
       playRoundStart();
     }
-    if ((phase === "choosing_word" || phase === "game_over") && prevPhase === "playing") {
+    if (phase === "choosing_word" && prevPhase === "playing") {
       playRoundEnd();
     }
   }, [phase]);
@@ -447,6 +448,15 @@ export default function Room({ routeRoomId }: RoomProps) {
       });
     }
   }, [activeStrokeColor, activeTool, brushSize, liveStrokePoints, strokes]);
+
+  // Clear the live stroke preview once the committed stroke arrives from the server
+  useEffect(() => {
+    if (pendingStrokeRef.current) {
+      pendingStrokeRef.current = false;
+      drawingPointsRef.current = [];
+      setLiveStrokePoints([]);
+    }
+  }, [strokes]);
 
   function getCanvasPoint(event: ReactPointerEvent<HTMLCanvasElement>): StrokePoint {
     const canvas = canvasRef.current;
@@ -512,13 +522,15 @@ export default function Room({ routeRoomId }: RoomProps) {
 
     setIsDrawing(false);
     const points = drawingPointsRef.current;
-    drawingPointsRef.current = [];
-    setLiveStrokePoints([]);
 
     if (points.length < 2) {
+      drawingPointsRef.current = [];
+      setLiveStrokePoints([]);
       return;
     }
 
+    // Keep live stroke visible until the committed stroke arrives in Redux
+    pendingStrokeRef.current = true;
     void dispatch(
       sendStroke({
         roomId: displayRoomId,
