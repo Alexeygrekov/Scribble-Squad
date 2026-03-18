@@ -8,7 +8,7 @@ import paintBucketIcon from "../assets/tools/paint_bucket2.png";
 import undoIcon from "../assets/tools/undo2.png";
 import trashBinIcon from "../assets/tools/trash_bin.png";
 import alarmClockIcon from "../assets/ui/alarm_clock.png";
-import { playButtonClick, playHoverSnap, playRoundStart, playRoundEnd, playClockTick, playCorrectGuess, playGameOver, playConfettiCannon } from "../sounds";
+import { playButtonClick, playHoverSnap, playRoundStart, playRoundEnd, playClockTick, playCorrectGuess, playGameOver, playConfettiCannon, playConfettiPop } from "../sounds";
 
 const SESSION_KEY = "scribble_squad_tab_session";
 const ROOM_NOT_FOUND_ERROR = "Room not found.";
@@ -374,11 +374,11 @@ export default function Room({ routeRoomId }: RoomProps) {
     }
 
     playGameOver();
-    setTimeout(() => playConfettiCannon(), 400);
 
     setShowGameOverTransition(true);
     const timerId = window.setTimeout(() => {
       setShowGameOverTransition(false);
+      playConfettiCannon();
     }, 1300);
 
     return () => {
@@ -651,7 +651,7 @@ export default function Room({ routeRoomId }: RoomProps) {
           <section className="mx-auto mt-8 grid max-w-4xl items-end gap-4 sm:grid-cols-3">
             <div className="order-1 sm:order-1">
               {secondPlace ? (
-                <div className="podium-card podium-enter podium-enter-2nd group relative overflow-visible rounded-lg border-2 border-zinc-400 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                <div className="podium-card podium-enter podium-enter-2nd group relative overflow-visible rounded-lg border-2 border-zinc-400 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]" onMouseEnter={playConfettiPop}>
                   <div className="podium-burst-container" aria-hidden="true">
                     {secondPlaceBurst.map((piece, index) => (
                       <span
@@ -686,7 +686,7 @@ export default function Room({ routeRoomId }: RoomProps) {
 
             <div className="order-2 sm:order-2">
               {firstPlace ? (
-                <div className="podium-card podium-enter podium-enter-1st group relative overflow-visible rounded-lg border-2 border-amber-300 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                <div className="podium-card podium-enter podium-enter-1st group relative overflow-visible rounded-lg border-2 border-amber-300 bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]" onMouseEnter={playConfettiPop}>
                   <div className="podium-burst-container" aria-hidden="true">
                     {firstPlaceBurst.map((piece, index) => (
                       <span
@@ -721,7 +721,7 @@ export default function Room({ routeRoomId }: RoomProps) {
 
             <div className="order-3 sm:order-3">
               {thirdPlace ? (
-                <div className="podium-card podium-enter podium-enter-3rd group relative overflow-visible rounded-lg border-2 border-[#cd7f32] bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]">
+                <div className="podium-card podium-enter podium-enter-3rd group relative overflow-visible rounded-lg border-2 border-[#cd7f32] bg-zinc-100/95 p-5 text-center shadow-[0_18px_34px_rgba(0,0,0,0.25)]" onMouseEnter={playConfettiPop}>
                   <div className="podium-burst-container" aria-hidden="true">
                     {thirdPlaceBurst.map((piece, index) => (
                       <span

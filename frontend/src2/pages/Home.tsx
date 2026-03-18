@@ -4,6 +4,10 @@ import { clearError, createGame, joinGame, setError } from "../store";
 import paintPaletteImage from "../assets/ui/paint_palette2.png";
 import { playButtonClick, playHoverSnap, unlockAudio } from "../sounds";
 
+// Preload the hero image so it's cached before first render
+const preloadImg = new Image();
+preloadImg.src = paintPaletteImage;
+
 const inputClassName =
   "w-full border border-zinc-700 bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-900 outline-none placeholder:text-slate-400 focus:border-zinc-900";
 const buttonClassName =

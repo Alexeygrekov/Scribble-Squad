@@ -201,6 +201,24 @@ export function playGameOver() {
   });
 }
 
+// --- Mini confetti pop: lighter version for hover on podium cards ---
+export function playConfettiPop() {
+  if (!isAudioReady()) return;
+  playNoise(0.1, 0.05);
+  const ctx = getAudioContext();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = "sawtooth";
+  osc.frequency.setValueAtTime(300, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.08);
+  gain.gain.setValueAtTime(0.04, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 0.12);
+}
+
 // --- Confetti cannon: burst of noise + rising tone ---
 export function playConfettiCannon() {
   playNoise(0.25, 0.1);
