@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from "../hooks";
 import { leaveLobby, startGame } from "../store";
 import { useRoomSocket } from "../useRoomSocket";
 import { playButtonClick, playHoverSnap } from "../sounds";
+import VantaFog from "../components/VantaFog";
 
 const SESSION_KEY = "scribble_squad_tab_session";
 const ROOM_NOT_FOUND_ERROR = "Room not found.";
@@ -105,11 +106,12 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-4 pb-4 pt-0 sm:px-7 sm:pb-6 sm:pt-0">
-      <header className="flex h-[88px] items-center xl:h-[96px]">
+    <div className="relative min-h-screen px-4 pb-4 pt-0 sm:px-7 sm:pb-6 sm:pt-0">
+      <VantaFog />
+      <header className="relative z-10 flex h-[88px] items-center xl:h-[96px]">
         <button
           type="button"
-          className="inline-flex h-10 min-w-[74px] items-center justify-center rounded-md bg-orange-500 px-4 text-sm font-bold tracking-wide text-white transition hover:-translate-y-0.5 hover:bg-orange-600 hover:ring-2 hover:ring-sky-300"
+          className="inline-flex h-10 min-w-[74px] items-center justify-center rounded-md bg-[#10a4e4] px-4 text-sm font-bold tracking-wide text-white transition hover:-translate-y-0.5 hover:bg-[#0e8fcb] hover:ring-2 hover:ring-red-500"
           onClick={handleGoHome}
           onMouseEnter={playHoverSnap}
         >
@@ -117,7 +119,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
         </button>
       </header>
 
-      <main className="mx-auto mt-0 w-full max-w-5xl">
+      <main className="relative z-10 mx-auto mt-0 w-full max-w-5xl">
         <h1 className="font-['Bebas_Neue'] text-6xl leading-none tracking-widest text-white">Lobby</h1>
         <div className="mt-2 flex flex-wrap items-center gap-3 text-white">
           <p className="text-3xl font-semibold tracking-wide">
@@ -163,7 +165,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
 
         <button
           type="button"
-          className="mt-5 w-full rounded-md border border-white/25 bg-[#ff5a4a] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition-[background-color,box-shadow] duration-100 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-65"
+          className="mt-5 w-full rounded-md border border-white/25 bg-[#10a4e4] px-4 py-4 text-center font-['Bebas_Neue'] text-5xl leading-none tracking-wide text-white transition-[background-color,box-shadow] duration-100 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#0e8fcb] enabled:hover:ring-2 enabled:hover:ring-red-500 disabled:cursor-not-allowed disabled:opacity-65"
           disabled={!canStart}
           onClick={handleStartGame}
           onMouseEnter={playHoverSnap}

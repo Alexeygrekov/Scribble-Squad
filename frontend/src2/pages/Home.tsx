@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from "../hooks";
 import { clearError, createGame, joinGame, setError } from "../store";
 import paintPaletteImage from "../assets/ui/paint_palette2.png";
 import { playButtonClick, playHoverSnap, unlockAudio } from "../sounds";
+import VantaFog from "../components/VantaFog";
 
 // Preload the hero image so it's cached before first render
 const preloadImg = new Image();
@@ -11,7 +12,7 @@ preloadImg.src = paintPaletteImage;
 const inputClassName =
   "w-full border border-zinc-700 bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-900 outline-none placeholder:text-slate-400 focus:border-zinc-900";
 const buttonClassName =
-  "w-full rounded-md border border-white/25 bg-[#ff5a4a] px-3 py-2 text-center font-['Bebas_Neue'] text-2xl tracking-wide text-white transition-[background-color,box-shadow] duration-100 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#ff4c3a] enabled:hover:ring-2 enabled:hover:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-60";
+  "w-full rounded-md border border-white/25 bg-[#10a4e4] px-3 py-2 text-center font-['Bebas_Neue'] text-2xl tracking-wide text-white transition-[background-color,box-shadow] duration-100 enabled:hover:-translate-y-0.5 enabled:hover:scale-[1.01] enabled:hover:bg-[#0e8fcb] enabled:hover:ring-2 enabled:hover:ring-red-500 disabled:cursor-not-allowed disabled:opacity-60";
 
 type HomeProps = {
   initialJoinRoomId?: string;
@@ -63,9 +64,10 @@ export default function Home({ initialJoinRoomId = "" }: HomeProps) {
   }
 
   return (
-    <div className="min-h-screen xl:h-[100dvh] xl:overflow-hidden">
-      <div className="grid min-h-screen xl:h-[100dvh] xl:grid-cols-2">
-        <section className="flex items-center justify-center bg-gradient-to-br from-[#1fb2f0] via-[#10a4e4] to-[#108ed7] px-6 py-10 sm:px-10">
+    <div className="relative min-h-screen xl:h-[100dvh] xl:overflow-hidden">
+      <VantaFog />
+      <div className="relative z-10 grid min-h-screen xl:h-[100dvh] xl:grid-cols-2">
+        <section className="flex items-center justify-center px-6 py-10 sm:px-10">
           <div className="w-full max-w-2xl">
             <h1 className="font-['Bebas_Neue'] text-7xl leading-none tracking-wider text-white drop-shadow-[0_3px_0_rgba(0,0,0,0.2)] sm:text-8xl">
               Scribble Squad
@@ -82,7 +84,7 @@ export default function Home({ initialJoinRoomId = "" }: HomeProps) {
           </div>
         </section>
 
-        <section className="flex items-center justify-center bg-[#ff5a4a] px-4 py-10 sm:px-8">
+        <section className="flex items-center justify-center bg-[#10a4e4] px-4 py-10 sm:px-8">
           <div className="w-full max-w-sm rounded-lg bg-[#ececec] p-6 shadow-[0_20px_35px_rgba(0,0,0,0.20)] sm:p-8">
             <form className="space-y-3" onSubmit={handleJoinSubmit}>
               <h2 className="font-['Bebas_Neue'] text-4xl leading-none tracking-wide text-zinc-950">
