@@ -3,7 +3,10 @@
     "allow": [
       "Bash(node --check src/index.js)",
       "Bash(node --check src/routes/rooms.js)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm install:*)",
+      "Bash(npx vite:*)"
     ]
   }
 }
