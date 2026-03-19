@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node --check src/index.js)",
+      "Bash(node --check src/routes/rooms.js)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

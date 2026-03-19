@@ -5,7 +5,7 @@ import morgan from "morgan";
 import { WebSocket, WebSocketServer } from "ws";
 import "dotenv/config";
 import healthRouter from "./routes/health.js";
-import roomsRouter, { getRoomSnapshot, subscribeRoomUpdates } from "./routes/rooms.js";
+import roomsRouter, { getRoomSnapshot, subscribeRoomUpdates, removePlayerFromRoom } from "./routes/rooms.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -53,6 +53,8 @@ app.use(errorHandler);
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: "/ws" });
 const socketClients = new Set();
+const disconnectTimers = new Map(); // key: "roomId:username" → timeout handle
+const DISCONNECT_GRACE_MS = 3000;
 
 function sendJson(socket, payload) {
   if (socket.readyState !== WebSocket.OPEN) {
@@ -94,6 +96,14 @@ wss.on("connection", (socket) => {
     client.roomId = roomId;
     client.username = username;
 
+    // Cancel any pending disconnect removal for this player
+    const disconnectKey = `${roomId}:${username.toLowerCase()}`;
+    const pendingTimer = disconnectTimers.get(disconnectKey);
+    if (pendingTimer) {
+      clearTimeout(pendingTimer);
+      disconnectTimers.delete(disconnectKey);
+    }
+
     const snapshot = getRoomSnapshot(roomId, username);
     if (!snapshot) {
       sendJson(socket, { type: "room_missing", roomId });
@@ -105,6 +115,40 @@ wss.on("connection", (socket) => {
 
   socket.on("close", () => {
     socketClients.delete(client);
+    if (client.roomId && client.username) {
+      const disconnectKey = `${client.roomId}:${client.username.toLowerCase()}`;
+      // Check if another socket for the same user is still connected
+      let stillConnected = false;
+      socketClients.forEach((other) => {
+        if (
+          other.roomId === client.roomId &&
+          other.username.toLowerCase() === client.username.toLowerCase() &&
+          other.socket.readyState === WebSocket.OPEN
+        ) {
+          stillConnected = true;
+        }
+      });
+      if (!stillConnected) {
+        // Grace period: wait before removing in case the client reconnects
+        const timer = setTimeout(() => {
+          disconnectTimers.delete(disconnectKey);
+          // Re-check: player may have reconnected during the grace period
+          let reconnected = false;
+          socketClients.forEach((other) => {
+            if (
+              other.roomId === client.roomId &&
+              other.username.toLowerCase() === client.username.toLowerCase()
+            ) {
+              reconnected = true;
+            }
+          });
+          if (!reconnected) {
+            removePlayerFromRoom(client.roomId, client.username);
+          }
+        }, DISCONNECT_GRACE_MS);
+        disconnectTimers.set(disconnectKey, timer);
+      }
+    }
   });
 
   socket.on("error", () => {

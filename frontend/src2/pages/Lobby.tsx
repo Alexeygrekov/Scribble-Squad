@@ -137,7 +137,7 @@ export default function Lobby({ routeRoomId }: LobbyProps) {
         </div>
 
         <section className="mt-6 rounded-lg bg-zinc-100 p-4 shadow-[0_12px_25px_rgba(0,0,0,0.15)] sm:p-6">
-          <ul className="max-h-[48vh] overflow-y-auto">
+          <ul className="max-h-[48vh] overflow-y-auto pr-2">
             {players.map((player) => (
               <li
                 key={player.name}

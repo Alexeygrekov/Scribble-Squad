@@ -20,6 +20,7 @@ const GUESS_ORDER_MIN_POINTS = 25;
 const GUESS_TIME_BONUS_MAX_POINTS = 25;
 const DRAWER_POINTS_PER_CORRECT_GUESS = 15;
 const MAX_CHAT_MESSAGES = 220;
+const MAX_ROUNDS_CAP = 8;
 const WORDS = [
   "xi jinping",
   "Vladimir Putin",
@@ -173,6 +174,17 @@ function shufflePlayers(players) {
     [shuffled[index], shuffled[pickedIndex]] = [shuffled[pickedIndex], shuffled[index]];
   }
   return shuffled;
+}
+
+// Compute total rounds based on player count:
+// ≤4 players: everyone draws twice (playerCount * 2)
+// >4 but <8 players: 8 rounds (go through everyone once, then fill remaining from those who drew once — no one draws 3 times)
+// ≥8 players: 8 rounds (each person draws at most once)
+function computeTotalRounds(playerCount) {
+  if (playerCount <= 4) {
+    return playerCount * 2;
+  }
+  return MAX_ROUNDS_CAP;
 }
 
 function pickWordChoices(count = CHOOSE_WORD_OPTIONS) {
@@ -375,6 +387,117 @@ function finishGame(room, reason) {
   }
 }
 
+export function removePlayerFromRoom(roomId, username) {
+  const normalizedRoomId = String(roomId || "").trim().toUpperCase();
+  const normalizedUsername = String(username || "").trim();
+  if (!normalizedRoomId || !normalizedUsername) return;
+
+  const room = rooms.get(normalizedRoomId);
+  if (!room) return;
+
+  const playerIndex = room.players.findIndex(
+    (p) => p.toLowerCase() === normalizedUsername.toLowerCase()
+  );
+  if (playerIndex === -1) return;
+
+  const resolvedName = room.players[playerIndex];
+
+  // Remove from players list
+  room.players.splice(playerIndex, 1);
+  // Remove from scores
+  delete room.scores[resolvedName];
+  // Remove from guessedPlayers
+  room.guessedPlayers.delete(resolvedName);
+  // Remove from draw queues
+  room.firstPassQueue = room.firstPassQueue.filter(
+    (p) => p.toLowerCase() !== resolvedName.toLowerCase()
+  );
+  room.secondPassQueue = room.secondPassQueue.filter(
+    (p) => p.toLowerCase() !== resolvedName.toLowerCase()
+  );
+
+  appendMessage(room, buildMessage("system", "System", `${resolvedName} left the game.`));
+
+  // If no players left, delete the room
+  if (room.players.length === 0) {
+    clearRoundTimeout(room.id);
+    clearChooseWordTimeout(room.id);
+    rooms.delete(normalizedRoomId);
+    writePersistedRooms();
+    notifyRoomUpdated(normalizedRoomId);
+    return;
+  }
+
+  // If only in lobby or game_over, just notify
+  if (room.phase === "lobby" || room.phase === "game_over") {
+    writePersistedRooms();
+    notifyRoomUpdated(normalizedRoomId);
+    return;
+  }
+
+  // Game is in progress — recalculate total rounds
+  const newTotalRounds = computeTotalRounds(room.players.length);
+  // Don't increase rounds, only decrease
+  if (newTotalRounds < room.totalRounds) {
+    room.totalRounds = newTotalRounds;
+  }
+
+  // If only 1 player left, end the game
+  if (room.players.length < 2) {
+    finishGame(room, "Game over! Not enough players remaining.");
+    writePersistedRooms();
+    notifyRoomUpdated(normalizedRoomId);
+    return;
+  }
+
+  // If rounds already completed meets/exceeds new total, end game
+  if (room.roundsCompleted >= room.totalRounds) {
+    finishGame(room, "Game over! All rounds complete.");
+    writePersistedRooms();
+    notifyRoomUpdated(normalizedRoomId);
+    return;
+  }
+
+  // If the leaving player was the drawer, complete the round early and move on
+  if (room.drawer && room.drawer.toLowerCase() === resolvedName.toLowerCase()) {
+    room.drawer = null;
+    clearRoundTimeout(room.id);
+    clearChooseWordTimeout(room.id);
+
+    room.roundEndsAt = 0;
+    room.chooseEndsAt = 0;
+    room.word = "";
+    room.wordChoices = [];
+    room.strokes = [];
+    room.guessedPlayers = new Set();
+
+    // This drawer leaving counts as a completed round
+    room.roundsCompleted = clampNumber(room.roundsCompleted + 1, 0, room.totalRounds);
+
+    if (room.roundsCompleted >= room.totalRounds) {
+      finishGame(room, "Game over! All rounds complete.");
+    } else {
+      const nextDrawer = takeNextDrawer(room);
+      if (!nextDrawer) {
+        finishGame(room, "Game over! All rounds complete.");
+      } else {
+        room.roundNumber = room.roundsCompleted + 1;
+        enterChoosingWordPhase(room, nextDrawer);
+      }
+    }
+  } else if (room.phase === "playing") {
+    // A guesser left — check if everyone remaining has guessed
+    const totalGuessers = getTotalGuessers(room);
+    if (totalGuessers > 0 && room.guessedPlayers.size >= totalGuessers) {
+      const revealedWord = room.word;
+      completeActiveRound(room, `Round over! Everyone guessed the word ${revealedWord.toUpperCase()}.`);
+    }
+  }
+
+  writePersistedRooms();
+  notifyRoomUpdated(normalizedRoomId);
+}
+
 function getTotalGuessers(room) {
   if (!room.drawer) {
     return 0;
@@ -401,16 +524,16 @@ function completeActiveRound(room, reasonMessage) {
     appendMessage(room, buildMessage("system", "System", reasonMessage));
   }
 
-  room.roundsCompleted = clampNumber(room.roundsCompleted + 1, 0, room.totalRounds || room.players.length * 2);
+  room.roundsCompleted = clampNumber(room.roundsCompleted + 1, 0, room.totalRounds || computeTotalRounds(room.players.length));
 
   if (room.roundsCompleted >= room.totalRounds) {
-    finishGame(room, "Game over! Everyone has drawn twice.");
+    finishGame(room, "Game over! All rounds complete.");
     return;
   }
 
   const nextDrawer = takeNextDrawer(room);
   if (!nextDrawer) {
-    finishGame(room, "Game over! Everyone has drawn twice.");
+    finishGame(room, "Game over! All rounds complete.");
     return;
   }
 
@@ -580,7 +703,7 @@ function normalizePersistedRoom(rawRoom) {
   const totalRoundsFromStore = Number(rawRoom?.totalRounds);
   const totalRounds = Number.isFinite(totalRoundsFromStore) && totalRoundsFromStore > 0
     ? Math.floor(totalRoundsFromStore)
-    : players.length * 2;
+    : computeTotalRounds(players.length);
 
   const roundsCompletedFromStore = Number(rawRoom?.roundsCompleted);
   const roundsCompleted = clampNumber(
@@ -958,7 +1081,7 @@ router.post("/:roomId/start", (req, res) => {
     return;
   }
 
-  room.totalRounds = room.players.length * 2;
+  room.totalRounds = computeTotalRounds(room.players.length);
   room.roundsCompleted = 0;
   room.roundNumber = 1;
   room.firstPassQueue = firstPassOrder;
