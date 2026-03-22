@@ -1,16 +1,16 @@
 # Scribble Squad
 
-A real-time multiplayer drawing and guessing game where players take turns sketching a word while others race to guess it. Inspired by classic party games like Skribbl.io, Scribble Squad brings the fun of draw-and-guess gameplay with a modern interface, live animations, and sound effects.
+A real-time multiplayer drawing and guessing game where players take turns sketching a word while others race to guess it. Inspired by classic party games like Skribbl.io.
 
 ## Screenshots
 
 | Home | Lobby | Word Picking |
 |:---:|:---:|:---:|
-| ![Home](screenshots/home.png) | ![Lobby](screenshots/lobby.png) | ![Word Picking](screenshots/word-picking.png) |
+| ![Home](screenshots/home_screenshot.png) | ![Lobby](screenshots/lobby_screenshot.png) | ![Word Picking](screenshots/word-picking.png) |
 
 | Drawing | Guessing | Podium |
 |:---:|:---:|:---:|
-| ![Drawing](screenshots/drawing.png) | ![Guessing](screenshots/guessing.png) | ![Podium](screenshots/podium.png) |
+| ![Drawing](screenshots/drawing_screenshot.png) | ![Guessing](screenshots/guessing_screenshot.png) | ![Podium](screenshots/podium_screenshot.png) |
 
 ## How It Works
 
@@ -45,7 +45,6 @@ A real-time multiplayer drawing and guessing game where players take turns sketc
 
 - **Node.js** with **Express** — HTTP API for room creation, joining, guessing, and drawing
 - **WebSockets (ws)** — real-time bidirectional communication for live game updates, canvas syncing, and chat
-- **File-based persistence** — room state saved to disk for crash recovery
 
 ### Real-Time Communication
 
